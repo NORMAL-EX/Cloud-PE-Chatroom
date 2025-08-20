@@ -1,0 +1,127 @@
+基于代码中的依赖项，我为你生成三个NOTICE文件：
+前端 NOTICE
+Cloud-PE Frontend - Third Party Notices
+
+This software includes the following third-party components:
+
+--------------------------------------------------------------------------------
+React (https://reactjs.org/)
+Copyright (c) Meta Platforms, Inc. and affiliates.
+License: MIT
+
+React-DOM (https://reactjs.org/)
+Copyright (c) Meta Platforms, Inc. and affiliates.
+License: MIT
+
+React Router DOM (https://reactrouter.com/)
+Copyright (c) React Training LLC 2015-2019
+Copyright (c) Remix Software Inc. 2020-2021
+Copyright (c) Shopify Inc. 2022-2023
+License: MIT
+
+React Markdown (https://github.com/remarkjs/react-markdown)
+Copyright (c) 2015 Espen Hovlandsdal
+License: MIT
+
+Semi Design UI (@douyinfe/semi-ui)
+Copyright (c) 2019-present Bytedance Inc.
+License: MIT
+
+Axios (https://axios-http.com/)
+Copyright (c) 2014-present Matt Zabriskie & Collaborators
+License: MIT
+
+DOMPurify (https://github.com/cure53/DOMPurify)
+Copyright (c) 2024 Dr.-Ing. Mario Heiderich, Cure53
+License: Apache-2.0 OR MPL-2.0
+
+Markdown-it (https://github.com/markdown-it/markdown-it)
+Copyright (c) 2014 Vitaly Puzrin, Alex Kocharin
+License: MIT
+
+TypeScript (https://www.typescriptlang.org/)
+Copyright (c) 2012-2023 Microsoft Corporation
+License: Apache-2.0
+
+Vite (https://vitejs.dev/)
+Copyright (c) 2019-present, Yuxi (Evan) You and Vite contributors
+License: MIT
+
+ESLint (https://eslint.org/)
+Copyright OpenJS Foundation and other contributors
+License: MIT
+--------------------------------------------------------------------------------
+后端 NOTICE
+Cloud-PE Backend - Third Party Notices
+
+This software includes the following third-party components:
+
+--------------------------------------------------------------------------------
+Actix Web (https://actix.rs/)
+Copyright (c) 2017-present Nikolay Kim and contributors
+License: MIT OR Apache-2.0
+
+Actix CORS
+Copyright (c) 2017-present Nikolay Kim and contributors
+License: MIT OR Apache-2.0
+
+Actix WebSocket (actix-ws)
+Copyright (c) 2017-present Nikolay Kim and contributors
+License: MIT OR Apache-2.0
+
+Actix Files
+Copyright (c) 2017-present Nikolay Kim and contributors
+License: MIT OR Apache-2.0
+
+Tokio (https://tokio.rs/)
+Copyright (c) 2016 Tokio Contributors
+License: MIT
+
+Serde (https://serde.rs/)
+Copyright (c) 2014-2017 Erick Tryzelaar and David Tolnay
+License: MIT OR Apache-2.0
+
+Serde JSON
+Copyright (c) 2014-2017 Erick Tryzelaar and David Tolnay
+License: MIT OR Apache-2.0
+
+Chrono (https://github.com/chronotope/chrono)
+Copyright (c) 2014-2022, Kang Seonghoon and contributors
+License: MIT OR Apache-2.0
+
+SHA2 (https://github.com/RustCrypto/hashes)
+Copyright (c) 2016-2024 RustCrypto Developers
+License: MIT OR Apache-2.0
+
+Hex (https://github.com/KokaKiwi/rust-hex)
+Copyright (c) 2015-2024 KokaKiwi
+License: MIT OR Apache-2.0
+
+UUID (https://github.com/uuid-rs/uuid)
+Copyright (c) 2014-2024 The Uuid Project Developers
+License: MIT OR Apache-2.0
+
+Lettre (https://lettre.rs/)
+Copyright (c) 2014-2024 Alexis Mousset and contributors
+License: MIT OR Apache-2.0
+
+Rand (https://rust-random.github.io/)
+Copyright (c) 2014-2024 The Rust Project Developers
+License: MIT OR Apache-2.0
+
+Futures-util
+Copyright (c) 2016 Alex Crichton and contributors
+License: MIT OR Apache-2.0
+
+Lazy_static
+Copyright (c) 2014-2020 Marvin Löbel
+License: MIT OR Apache-2.0
+
+Regex (https://github.com/rust-lang/regex)
+Copyright (c) 2014-2024 The Rust Project Developers
+License: MIT OR Apache-2.0
+
+Mime_guess
+Copyright (c) 2015-2024 Austin Bonander
+License: MIT
+--------------------------------------------------------------------------------

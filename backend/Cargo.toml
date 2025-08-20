@@ -1,0 +1,30 @@
+[package]
+name = "cloud-pe-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4"
+actix-cors = "0.7"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+hex = "0.4"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+lettre = { version = "0.11", features = ["tokio1-native-tls", "builder"] }
+rand = "0.8"
+actix-ws = "0.2"
+futures-util = "0.3"
+actix = "0.13"
+lazy_static = "1.4"
+regex = "1.10"
+actix-files = "0.6"
+mime_guess = "2.0"
+
+[target.x86_64-unknown-linux-gnu]
+linker = "x86_64-linux-gnu-gcc"
+
+[target.x86_64-unknown-linux-musl]
+linker = "x86_64-linux-musl-gcc"
