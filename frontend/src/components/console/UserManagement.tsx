@@ -3,7 +3,7 @@ import {
   Table, 
   Button, 
   Typography, 
-  Card, 
+  
   Modal, 
   Form, 
   Toast, 
@@ -210,7 +210,7 @@ const UserManagement: React.FC = () => {
   ];
 
   return (
-    <Card>
+    <>
       <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Title heading={4}>用户管理</Title>
         <div style={{ display: 'flex', gap: 12 }}>
@@ -301,7 +301,7 @@ const UserManagement: React.FC = () => {
           </div>
         </Form>
       </Modal>
-    </Card>
+    </>
   );
 };
 

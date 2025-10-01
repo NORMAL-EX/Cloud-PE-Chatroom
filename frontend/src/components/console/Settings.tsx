@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Switch, Typography, Toast, Spin } from '@douyinfe/semi-ui';
+import { Switch, Typography, Toast, Spin } from '@douyinfe/semi-ui';
 import axios from 'axios';
 
 const { Title, Text } = Typography;
@@ -66,16 +66,16 @@ const Settings: React.FC = () => {
 
   if (loading) {
     return (
-      <Card>
+      <>
         <div style={{ textAlign: 'center', padding: 40 }}>
           <Spin size="large" />
         </div>
-      </Card>
+      </>
     );
   }
 
   return (
-    <Card>
+    <>
       <div style={{ marginBottom: 24 }}>
         <Title heading={4}>系统设置</Title>
       </div>
@@ -116,7 +116,7 @@ const Settings: React.FC = () => {
           </div>
         </div>
       )}
-    </Card>
+    </>
   );
 };
 

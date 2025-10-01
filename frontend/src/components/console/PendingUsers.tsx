@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Typography, Card, Empty, Toast, Popconfirm } from '@douyinfe/semi-ui';
+import { Table, Button, Typography, Empty, Toast, Popconfirm } from '@douyinfe/semi-ui';
 import { IconCheckCircleStroked, IconMinusCircle, IconInbox } from '@douyinfe/semi-icons';
 import axios from 'axios';
 
@@ -125,14 +125,14 @@ const PendingUsers: React.FC = () => {
   ];
 
   return (
-    <Card>
+    <>
       <div style={{ marginBottom: 16 }}>
         <Title heading={4}>待审核用户</Title>
       </div>
       
       {users.length === 0 && !loading ? (
         <Empty
-          image= {<IconInbox style={{ fontSize: 50 }}/>}
+          image= {<IconInbox style={{ fontSize: 50, color: 'var(--semi-color-text-2)' }}/>}
           title="暂无待审核用户"
           description="所有注册申请都已处理完毕"
         />
@@ -145,7 +145,7 @@ const PendingUsers: React.FC = () => {
           pagination={false}
         />
       )}
-    </Card>
+    </>
   );
 };
 

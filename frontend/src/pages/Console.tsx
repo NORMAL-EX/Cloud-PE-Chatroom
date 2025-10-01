@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Nav, Typography, Button, Avatar } from '@douyinfe/semi-ui';
+import { Layout, Nav, Typography, Button, Avatar, Dropdown } from '@douyinfe/semi-ui';
 import {
   IconUserGroup, 
-  IconSetting, 
-  IconHome,
+  IconSetting,
   IconMoon,
   IconSun,
   IconCheckCircleStroked
@@ -96,20 +95,24 @@ const Console: React.FC = () => {
               icon={theme === 'light' ? <IconMoon /> : <IconSun />}
               onClick={toggleTheme}
             />
-            <Button
-              theme="borderless"
-              icon={<IconHome />}
-              onClick={() => navigate('/')}
+            <Dropdown
+              render={
+                <Dropdown.Menu>
+                  <Dropdown.Item disabled style={{ cursor: 'default' }}>
+                    <Text strong>{user?.username}</Text>
+                  </Dropdown.Item>
+                  <Dropdown.Divider />
+                  <Dropdown.Item onClick={() => navigate('/')}>
+                    返回聊天
+                  </Dropdown.Item>
+                  <Dropdown.Item onClick={logout}>
+                    退出登录
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              }
             >
-              返回聊天
-            </Button>
-            <div className="user-info">
               {getAvatar()}
-              <Text>{user?.username}</Text>
-            </div>
-            <Button theme="borderless" onClick={logout}>
-              退出登录
-            </Button>
+            </Dropdown>
           </div>
         </div>
       </Header>

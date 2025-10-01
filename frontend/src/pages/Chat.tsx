@@ -1101,20 +1101,23 @@ const Chat: React.FC = () => {
             icon={theme === 'light' ? <IconMoon /> : <IconSun />}
             onClick={toggleTheme}
           />
-          {user?.role === 'Admin' && (
-            <Button
-              onClick={() => window.open('/console', '_blank')}
-            >
-              管理后台
-            </Button>
-          )}
           <Dropdown
             render={
               <Dropdown.Menu>
+                <Dropdown.Item disabled style={{ cursor: 'default' }}>
+                  <Text strong>{user?.username}</Text>
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                {user?.role === 'Admin' && (
+                  <>
+                    <Dropdown.Item onClick={() => window.open('/console', '_blank')}>
+                      管理后台
+                    </Dropdown.Item>
+                  </>
+                )}
                 {user?.role !== 'Admin' && (
                   <>
                     <Dropdown.Item onClick={handleDeleteAccount}>注销账号</Dropdown.Item>
-                    <Dropdown.Divider />
                   </>
                 )}
                 <Dropdown.Item onClick={logout}>退出登录</Dropdown.Item>

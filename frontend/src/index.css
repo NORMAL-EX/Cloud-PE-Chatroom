@@ -1,3 +1,127 @@
+html, body, #rootM{
+  background: var(--semi-color-bg-0);
+}
+
+.semi-switch-checked , .semi-switch-checked:hover {
+  background-color: var(--semi-color-info) !important;
+}
+
+.semi-layout-has-sider>.semi-layout,
+.semi-layout-has-sider>.semi-layout-content {
+  overflow-x: hidden;
+  border-top-left-radius: 9px;
+  border-left: 1px solid var(--semi-color-border);
+  border-top: 1px solid var(--semi-color-border);
+  overflow: hidden;
+  background: var(--semi-color-bg-0);  /* 新增这一行 */
+}
+.semi-dropdown-divider {
+  height: 0.5px;
+}
+
+.semi-toast-content {
+  border: 1px solid var(--semi-color-border);
+  box-shadow: none !important;
+}
+
+.semi-card {
+  border-radius: 9px;
+}
+
+.semi-dropdown-wrapper {
+  box-shadow: none !important;
+  border: 1px solid var(--semi-color-border);
+}
+
+.sider-content {
+  margin-top: -22px !important;
+}
+
+.semi-layout-sider {
+  border-right: none !important;
+}
+
+.semi-layout-header {
+  border-bottom: none !important;
+}
+
+.semi-table-row-head {
+  border-bottom: 1px solid var(--semi-color-border) !important;
+}
+
+.semi-navigation {
+  border-right: none !important;
+}
+
+.semi-tabs-pane {
+  margin-top: 10px;
+}
+
+body[theme-mode=dark],
+body .semi-always-dark,
+:host([theme-mode=dark]),
+:host .semi-always-dark {
+  --menu--color: rgba(var(--semi-blue-5), .2);
+  --semi-color-bg-1: var(--semi-color-bg-0);
+  --semi-color-bg-2: var(--semi-color-bg-0);
+  --semi-color-bg-3: var(--semi-color-bg-0);
+  --semi-color-bg-4: var(--semi-color-bg-0);
+  --semi-color-nav-bg: var(--semi-color-bg-0);
+  --semi-color-bg-ap: rgba(67, 68, 74, 1);
+  --semi-blue-5: 46, 143, 248;
+  --semi-blue-6: 21, 137, 246;
+  --semi-blue-7: 8, 95, 176;
+  --semi-color-fill-0: rgba(var(--semi-white), .1);
+}
+
+body,
+body[theme-mode=dark] .semi-always-light,
+:host,
+:host .semi-always-light {
+  --menu--color: rgba(var(--semi-blue-1), 1);
+  --semi-color-bg-ap: rgb(237 237 237);
+}
+
+.semi-table-wrapper {
+  min-height: 0 !important;
+}
+
+.semi-tree-option-list li.semi-tree-option {
+  border-radius: var(--semi-border-radius-full) !important;
+}
+
+.semi-banner,
+.semi-table-body {
+  border-radius: var(--semi-border-radius-small) !important;
+}
+
+* {
+  --semi-border-radius-small: 6px !important;
+}
+
+.semi-modal-content {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 * {
   margin: 0;
   padding: 0;
