@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { Spin } from '@douyinfe/semi-ui';
+import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '../contexts/AuthContext';
 
 interface AdminRouteProps {
@@ -18,7 +18,7 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
         alignItems: 'center', 
         justifyContent: 'center' 
       }}>
-        <Spin size="large" />
+        <Spinner className="w-8 h-8" />
       </div>
     );
   }

@@ -1,21 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Table, 
-  Button, 
-  Typography, 
-  
-  Modal, 
-  Form, 
-  Toast, 
-  Tag,
-  Popconfirm,
-  Input,
-  Dropdown
-} from '@douyinfe/semi-ui';
-import { IconUserAdd, IconSearch, IconMore } from '@douyinfe/semi-icons';
+import { UserPlus, Search, MoreVertical } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Table } from '@/components/ui/table';
+import { Dialog, DialogPopup, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Menu, MenuTrigger, MenuPopup, MenuItem, MenuSeparator } from '@/components/ui/menu';
+import { toastManager } from '@/components/ui/toast';
 import axios from 'axios';
-
-const { Title } = Typography;
 
 interface User {
   id: string;
@@ -31,10 +24,16 @@ interface User {
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    avatar: ''
+  });
 
   useEffect(() => {
     loadUsers();
@@ -48,41 +47,49 @@ const UserManagement: React.FC = () => {
         setUsers(response.data.data);
       }
     } catch (error) {
-      Toast.error('加载用户列表失败');
+      toastManager.add({ title: '加载用户列表失败', type: 'error' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddUser = async (values: any) => {
+  const handleAddUser = async () => {
+    if (!formData.username || !formData.email || !formData.password) {
+      toastManager.add({ title: '请填写所有必填字段', type: 'error' });
+      return;
+    }
+    
     setAddLoading(true);
     try {
-      const response = await axios.post('/api/add-user', values);
+      const response = await axios.post('/api/add-user', formData);
       if (response.data.success) {
-        Toast.success('用户添加成功');
+        toastManager.add({ title: '用户添加成功', type: 'success' });
         setAddModalVisible(false);
+        setFormData({ username: '', email: '', password: '', avatar: '' });
         loadUsers();
       } else {
-        Toast.error(response.data.message);
+        toastManager.add({ title: response.data.message, type: 'error' });
       }
     } catch (error) {
-      Toast.error('添加失败');
+      toastManager.add({ title: '添加失败', type: 'error' });
     } finally {
       setAddLoading(false);
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm('确定要删除该用户吗？')) return;
+    
     try {
       const response = await axios.post('/api/delete-user', { user_id: userId });
       if (response.data.success) {
-        Toast.success('用户已删除');
+        toastManager.add({ title: '用户已删除', type: 'success' });
         loadUsers();
       } else {
-        Toast.error(response.data.message);
+        toastManager.add({ title: response.data.message, type: 'error' });
       }
     } catch (error) {
-      Toast.error('删除失败');
+      toastManager.add({ title: '删除失败', type: 'error' });
     }
   };
 
@@ -93,214 +100,170 @@ const UserManagement: React.FC = () => {
         is_deputy: isDeputy 
       });
       if (response.data.success) {
-        Toast.success(isDeputy ? '已设为次管理员' : '已取消次管理员');
+        toastManager.add({ title: isDeputy ? '已设为次管理员' : '已取消次管理员', type: 'success' });
         loadUsers();
       } else {
-        Toast.error(response.data.message);
+        toastManager.add({ title: response.data.message, type: 'error' });
       }
     } catch (error) {
-      Toast.error('操作失败');
+      toastManager.add({ title: '操作失败', type: 'error' });
     }
   };
 
-  // 先过滤，再排序
   const filteredUsers = users
     .filter(user => 
       user.username.toLowerCase().includes(searchText.toLowerCase()) ||
       user.email.toLowerCase().includes(searchText.toLowerCase())
     )
     .sort((a, b) => {
-      // 定义角色优先级
       const roleOrder = { 'Admin': 0, 'DeputyAdmin': 1, 'Member': 2 };
-      
-      // 按角色排序
       const roleCompare = roleOrder[a.role] - roleOrder[b.role];
       if (roleCompare !== 0) return roleCompare;
-      
-      // 如果角色相同，按注册时间排序（新的在前）
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
-  const columns = [
-    {
-      title: '用户名',
-      dataIndex: 'username',
-      key: 'username',
-      render: (username: string, record: User) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {username}
-          {record.role === 'Admin' && <Tag size="small" style={{ backgroundColor: 'var(--admin-tag-background)', color: 'var(--admin-tag-color)', borderColor: 'var(--admin-tag-background)' }}>管理员</Tag>}
-          {record.role === 'DeputyAdmin' && <Tag color="green">次管理员</Tag>}
-        </div>
-      ),
-    },
-    {
-      title: '邮箱',
-      dataIndex: 'email',
-      key: 'email',
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (_: string, record: User) => {
-        if (record.muted_until && new Date(record.muted_until) > new Date()) {
-          const remaining = Math.ceil((new Date(record.muted_until).getTime() - Date.now()) / 1000 / 60);
-          return <Tag color="yellow">禁言中 ({remaining}分钟)</Tag>;
-        }
-        return <Tag color="green">正常</Tag>;
-      },
-    },
-    {
-      title: '注册时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      render: (date: string) => new Date(date).toLocaleString(),
-    },
-    {
-      title: '最近IP',
-      dataIndex: 'last_ips',
-      key: 'last_ips',
-      render: (ips: string[]) => ips.length > 0 ? ips[ips.length - 1] : '无记录',
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      render: (_: any, record: User) => (
-        <div style={{ display: 'flex', gap: 8 }}>
-          {record.role !== 'Admin' && (
-            <Dropdown
-              trigger="click"
-              position="bottomRight"
-              render={
-                <Dropdown.Menu>
-                  {record.role === 'Member' && (
-                    <Dropdown.Item onClick={() => handleSetDeputyAdmin(record.id, true)}>
-                      设为次管理员
-                    </Dropdown.Item>
-                  )}
-                  {record.role === 'DeputyAdmin' && (
-                    <Dropdown.Item onClick={() => handleSetDeputyAdmin(record.id, false)}>
-                      取消次管理员
-                    </Dropdown.Item>
-                  )}
-                  <Dropdown.Divider />
-                  <Popconfirm
-                    title="确认删除"
-                    content={`确定要删除用户 ${record.username} 吗？`}
-                    onConfirm={() => handleDeleteUser(record.id)}
-                  >
-                    <Dropdown.Item type="danger">
-                      删除用户
-                    </Dropdown.Item>
-                  </Popconfirm>
-                </Dropdown.Menu>
-              }
-            >
-              <Button
-                theme="borderless"
-                icon={<IconMore />}
-                size="small"
-              />
-            </Dropdown>
-          )}
-        </div>
-      ),
-    },
-  ];
-
   return (
     <>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title heading={4}>用户管理</Title>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <Input
-            prefix={<IconSearch />}
-            placeholder="搜索用户名或邮箱"
-            value={searchText}
-            onChange={setSearchText}
-            style={{ width: 240 }}
-          />
-          <Button
-            theme="solid"
-            type="primary"
-            icon={<IconUserAdd />}
-            onClick={() => setAddModalVisible(true)}
-          >
+      <div className="flex justify-between items-center mb-4">
+        <h4 className="text-xl font-semibold">用户管理</h4>
+        <div className="flex gap-3">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="搜索用户名或邮箱"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="pl-8 w-60"
+            />
+          </div>
+          <Button onClick={() => setAddModalVisible(true)}>
+            <UserPlus className="mr-2 h-4 w-4" />
             添加用户
           </Button>
         </div>
       </div>
       
-      <Table
-        columns={columns}
-        dataSource={filteredUsers}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          pageSize: 10,
-        }}
-      />
+      <div className="rounded-md border">
+        <Table>
+          <thead>
+            <tr>
+              <th>用户名</th>
+              <th>邮箱</th>
+              <th>状态</th>
+              <th>注册时间</th>
+              <th>最近IP</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredUsers.map((record) => (
+              <tr key={record.id}>
+                <td>
+                  <div className="flex items-center gap-2">
+                    {record.username}
+                    {record.role === 'Admin' && <Badge className="admin-tag">管理员</Badge>}
+                    {record.role === 'DeputyAdmin' && <Badge variant="secondary">次管理员</Badge>}
+                  </div>
+                </td>
+                <td>{record.email}</td>
+                <td>
+                  {record.muted_until && new Date(record.muted_until) > new Date() ? (
+                    <Badge variant="outline">禁言中</Badge>
+                  ) : (
+                    <Badge variant="secondary">正常</Badge>
+                  )}
+                </td>
+                <td>{new Date(record.created_at).toLocaleString()}</td>
+                <td>{record.last_ips.length > 0 ? record.last_ips[record.last_ips.length - 1] : '无记录'}</td>
+                <td>
+                  {record.role !== 'Admin' && (
+                    <Menu>
+                      <MenuTrigger render={
+                        <Button variant="ghost" size="sm">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      } />
+                      <MenuPopup>
+                        {record.role === 'Member' && (
+                          <MenuItem onClick={() => handleSetDeputyAdmin(record.id, true)}>
+                            设为次管理员
+                          </MenuItem>
+                        )}
+                        {record.role === 'DeputyAdmin' && (
+                          <MenuItem onClick={() => handleSetDeputyAdmin(record.id, false)}>
+                            取消次管理员
+                          </MenuItem>
+                        )}
+                        <MenuSeparator />
+                        <MenuItem onClick={() => handleDeleteUser(record.id)} className="text-destructive">
+                          删除用户
+                        </MenuItem>
+                      </MenuPopup>
+                    </Menu>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      </div>
 
-      <Modal
-        title="添加用户"
-        visible={addModalVisible}
-        onCancel={() => setAddModalVisible(false)}
-        footer={null}
-        bodyStyle={{ padding: '24px' }}
-      >
-        <Form onSubmit={handleAddUser}>
-          <Form.Input
-            field="username"
-            label="用户名"
-            rules={[{ required: true, message: '请输入用户名' }]}
-            placeholder="请输入用户名"
-          />
-          <Form.Input
-            field="email"
-            label="邮箱"
-            rules={[
-              { required: true, message: '请输入邮箱' },
-              { type: 'email', message: '请输入有效的邮箱地址' }
-            ]}
-            placeholder="请输入邮箱"
-          />
-          <Form.Input
-            field="password"
-            label="密码"
-            type="password"
-            rules={[{ required: true, message: '请输入密码' }]}
-            placeholder="请输入密码"
-          />
-          <Form.Input
-            field="avatar"
-            label="头像链接"
-            placeholder="请输入头像链接（选填）"
-          />
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'flex-end', 
-            marginTop: 24,
-            gap: 12,
-            paddingTop: 16
-          }}>
-            <Button
-              type="tertiary"
-              onClick={() => setAddModalVisible(false)}
-            >
-              取消
-            </Button>
-            <Button
-              theme="solid"
-              type="primary"
-              htmlType="submit"
-              loading={addLoading}
-            >
-              添加
-            </Button>
+      <Dialog open={addModalVisible} onOpenChange={setAddModalVisible}>
+        <DialogPopup>
+          <DialogHeader>
+            <DialogTitle>添加用户</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="username">用户名</Label>
+              <Input
+                id="username"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                placeholder="请输入用户名"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="email">邮箱</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="请输入邮箱"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="password">密码</Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="请输入密码"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="avatar">头像链接</Label>
+              <Input
+                id="avatar"
+                value={formData.avatar}
+                onChange={(e) => setFormData({ ...formData, avatar: e.target.value })}
+                placeholder="请输入头像链接（选填）"
+              />
+            </div>
           </div>
-        </Form>
-      </Modal>
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline" />}>取消</DialogClose>
+            <Button onClick={handleAddUser} disabled={addLoading}>
+              {addLoading ? '添加中...' : '添加'}
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
     </>
   );
 };

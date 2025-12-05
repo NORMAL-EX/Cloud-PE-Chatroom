@@ -5,6 +5,7 @@ type ThemeMode = 'light' | 'dark';
 interface ThemeContextType {
   theme: ThemeMode;
   toggleTheme: () => void;
+  setTheme: (theme: ThemeMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -17,9 +18,15 @@ export const useTheme = () => {
   return context;
 };
 
+const THEME_STORAGE_KEY = 'user-theme-preference';
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    // 检查系统主题偏好
+  const [theme, setThemeState] = useState<ThemeMode>(() => {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark') {
+      return stored;
+    }
+    
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark';
     }
@@ -27,26 +34,37 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   useEffect(() => {
-    // 监听系统主题变化
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
-      setTheme(e.matches ? 'dark' : 'light');
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY);
+      if (!stored) {
+        setThemeState(e.matches ? 'dark' : 'light');
+      }
     };
 
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    
+    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
   }, []);
 
   useEffect(() => {
-    document.body.setAttribute('theme-mode', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(theme);
   }, [theme]);
 
+  const setTheme = (newTheme: ThemeMode) => {
+    setThemeState(newTheme);
+    localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+  };
+
   const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );

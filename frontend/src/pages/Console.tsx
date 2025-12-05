@@ -1,29 +1,23 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Nav, Typography, Button, Avatar, Dropdown } from '@douyinfe/semi-ui';
-import {
-  IconUserGroup, 
-  IconSetting,
-  IconMoon,
-  IconSun,
-  IconCheckCircleStroked
-} from '@douyinfe/semi-icons';
+import { Moon, Sun, Users, Settings } from 'lucide-react';
+import { CheckCircle } from '@/components/icon/CheckCircle';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { Button } from '@/components/ui/button';
+import { Avatar } from '@/components/ui/avatar';
+import { Menu, MenuTrigger, MenuPopup, MenuItem, MenuSeparator } from '@/components/ui/menu';
 import PendingUsers from '../components/console/PendingUsers';
 import UserManagement from '../components/console/UserManagement';
-import Settings from '../components/console/Settings';
+import ConsoleSettings from '../components/console/Settings';
 import './Console.css';
-
-const { Header, Sider, Content, Footer } = Layout;
-const { Title, Text } = Typography;
 
 const Console: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [collapsed, setCollapsed] = useState(false);
+  
 
   const getSelectedKeys = () => {
     const path = location.pathname;
@@ -33,51 +27,26 @@ const Console: React.FC = () => {
     return ['pending'];
   };
 
-  const navItems = [
-    {
-      itemKey: 'pending',
-      text: '待审核用户',
-      icon: <IconCheckCircleStroked />,
-      onClick: () => navigate('/console/pending')
-    },
-    {
-      itemKey: 'users',
-      text: '用户管理',
-      icon: <IconUserGroup />,
-      onClick: () => navigate('/console/users')
-    },
-    {
-      itemKey: 'settings',
-      text: '系统设置',
-      icon: <IconSetting />,
-      onClick: () => navigate('/console/settings')
-    }
-  ];
-
   const getAvatar = () => {
     if (user?.avatar) {
-      return <Avatar src={user.avatar} size="small" />;
+      return <Avatar className="w-8 h-8"><img src={user.avatar} alt={user.username} /></Avatar>;
     }
     
     const name = user?.username || '?';
     const firstChar = name[0].toUpperCase();
     
     return (
-      <Avatar 
-        size="small" 
-        style={{ 
-          backgroundColor: 'var(--semi-color-primary)',
-          color: 'white'
-        }}
-      >
+      <Avatar className="w-8 h-8 bg-primary text-white">
         {firstChar}
       </Avatar>
     );
   };
 
+  const selectedKey = getSelectedKeys()[0];
+
   return (
-    <Layout className="console-layout">
-      <Header className="console-header">
+    <div className="console-layout">
+      <header className="console-header">
         <div className="header-content">
           <div className="header-left">
             <img 
@@ -87,73 +56,89 @@ const Console: React.FC = () => {
               onClick={() => navigate('/')}
               style={{ cursor: 'pointer' }}
             />
-            <Title heading={4} style={{ margin: 0 }}>管理后台</Title>
+            <h4 className="text-lg font-semibold m-0">管理后台</h4>
           </div>
           <div className="header-right">
             <Button
-              theme="borderless"
-              icon={theme === 'light' ? <IconMoon /> : <IconSun />}
+              variant="ghost"
+              size="icon"
               onClick={toggleTheme}
-            />
-            <Dropdown
-              render={
-                <Dropdown.Menu>
-                  <Dropdown.Item disabled style={{ cursor: 'default' }}>
-                    <Text strong>{user?.username}</Text>
-                  </Dropdown.Item>
-                  <Dropdown.Divider />
-                  <Dropdown.Item onClick={() => navigate('/')}>
-                    返回聊天
-                  </Dropdown.Item>
-                  <Dropdown.Item onClick={logout}>
-                    退出登录
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              }
             >
-              {getAvatar()}
-            </Dropdown>
+              {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+            </Button>
+            <Menu>
+              <MenuTrigger render={<button className="cursor-pointer">{getAvatar()}</button>} />
+              <MenuPopup>
+                <MenuItem disabled className="cursor-default font-semibold">
+                  {user?.username}
+                </MenuItem>
+                <MenuSeparator />
+                <MenuItem onClick={() => navigate('/')}>
+                  返回聊天
+                </MenuItem>
+                <MenuItem onClick={logout}>
+                  退出登录
+                </MenuItem>
+              </MenuPopup>
+            </Menu>
           </div>
         </div>
-      </Header>
+      </header>
 
-      <Layout className="console-body">
-        <Sider className="console-sider">
-          <Nav
-            selectedKeys={getSelectedKeys()}
-            items={navItems}
-            footer={{
-              collapseButton: true,
-            }}
-            isCollapsed={collapsed}
-            onCollapseChange={setCollapsed}
-          />
-        </Sider>
+      <div className="console-body">
+        <aside className="console-sider">
+          <nav className="flex flex-col gap-1 p-2">
+            <Button
+              variant={selectedKey === 'pending' ? 'secondary' : 'ghost'}
+              className="justify-start"
+              onClick={() => navigate('/console/pending')}
+            >
+              <CheckCircle size={18} className="mr-2" />
+              待审核用户
+            </Button>
+            <Button
+              variant={selectedKey === 'users' ? 'secondary' : 'ghost'}
+              className="justify-start"
+              onClick={() => navigate('/console/users')}
+            >
+              <Users className="mr-2 h-4 w-4" />
+              用户管理
+            </Button>
+            <Button
+              variant={selectedKey === 'settings' ? 'secondary' : 'ghost'}
+              className="justify-start"
+              onClick={() => navigate('/console/settings')}
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              系统设置
+            </Button>
+          </nav>
+        </aside>
 
-        <Content className="console-content">
+        <main className="console-content">
           <Routes>
             <Route path="/" element={<PendingUsers />} />
             <Route path="/pending" element={<PendingUsers />} />
             <Route path="/users" element={<UserManagement />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings" element={<ConsoleSettings />} />
           </Routes>
-        </Content>
-      </Layout>
+        </main>
+      </div>
 
-      <Footer className="console-footer">
-        <Text type="tertiary">© 2025 Cloud-PE Team.</Text>
-        <Text type="tertiary">
+      <footer className="console-footer">
+        <span className="text-sm text-muted-foreground">© 2025 Cloud-PE Team.</span>
+        <span className="text-sm text-muted-foreground">
           <a 
             href="https://beian.miit.gov.cn/#/Integrated/index" 
             target="_blank" 
             rel="noopener noreferrer"
-            style={{ color: 'inherit', textDecoration: 'none' }}
+            className="hover:underline"
           >
             鲁ICP备2023028946号
           </a>
-        </Text>
-      </Footer>
-    </Layout>
+        </span>
+      </footer>
+    </div>
   );
 };
 

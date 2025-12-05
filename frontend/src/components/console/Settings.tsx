@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Switch, Typography, Toast, Spin } from '@douyinfe/semi-ui';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
+import { toastManager } from '@/components/ui/toast';
 import axios from 'axios';
-
-const { Title, Text } = Typography;
 
 interface SystemSettings {
   registration_open: boolean;
@@ -26,7 +27,7 @@ const Settings: React.FC = () => {
         setSettings(response.data.data);
       }
     } catch (error) {
-      Toast.error('加载设置失败');
+      toastManager.add({ title: '加载设置失败', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -38,26 +39,22 @@ const Settings: React.FC = () => {
     const newSettings = { ...settings, [field]: value };
     setSettings(newSettings);
     
-    // 如果关闭了开放注册，同时关闭审核选项
     if (field === 'registration_open' && !value && newSettings.require_approval) {
       newSettings.require_approval = false;
       setSettings(newSettings);
     }
     
-    // 自动保存
     setSaving(true);
     try {
       const response = await axios.post('/api/update-settings', newSettings);
       if (response.data.success) {
-        Toast.success('设置已保存');
+        toastManager.add({ title: '设置已保存', type: 'success' });
       } else {
-        Toast.error(response.data.message);
-        // 恢复原设置
+        toastManager.add({ title: response.data.message, type: 'error' });
         loadSettings();
       }
     } catch (error) {
-      Toast.error('保存失败');
-      // 恢复原设置
+      toastManager.add({ title: '保存失败', type: 'error' });
       loadSettings();
     } finally {
       setSaving(false);
@@ -66,53 +63,46 @@ const Settings: React.FC = () => {
 
   if (loading) {
     return (
-      <>
-        <div style={{ textAlign: 'center', padding: 40 }}>
-          <Spin size="large" />
-        </div>
-      </>
+      <div className="flex justify-center items-center p-10">
+        <Spinner className="w-8 h-8" />
+      </div>
     );
   }
 
   return (
     <>
-      <div style={{ marginBottom: 24 }}>
-        <Title heading={4}>系统设置</Title>
+      <div className="mb-6">
+        <h4 className="text-xl font-semibold">系统设置</h4>
       </div>
       
       {settings && (
-        <div style={{ maxWidth: 600 }}>
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <Text strong style={{ fontSize: 14 }}>开放注册</Text>
-                <div style={{ marginTop: 4 }}>
-                  <Text type="tertiary" size="small">关闭后，新用户将无法注册</Text>
-                </div>
+        <div className="max-w-2xl space-y-6">
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <Label className="text-base font-medium">开放注册</Label>
+              <div className="text-sm text-muted-foreground mt-1">
+                关闭后，新用户将无法注册
               </div>
-              <Switch
-                checked={settings.registration_open}
-                onChange={(checked) => handleSettingChange('registration_open', checked)}
-                loading={saving}
-              />
             </div>
+            <Switch
+              checked={settings.registration_open}
+              onCheckedChange={(checked) => handleSettingChange('registration_open', checked)}
+              disabled={saving}
+            />
           </div>
           
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <Text strong style={{ fontSize: 14 }}>注册需要审核</Text>
-                <div style={{ marginTop: 4 }}>
-                  <Text type="tertiary" size="small">开启后，新用户注册后需要管理员审核才能登录</Text>
-                </div>
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <Label className="text-base font-medium">注册需要审核</Label>
+              <div className="text-sm text-muted-foreground mt-1">
+                开启后，新用户注册后需要管理员审核才能登录
               </div>
-              <Switch
-                checked={settings.require_approval}
-                onChange={(checked) => handleSettingChange('require_approval', checked)}
-                disabled={!settings.registration_open || saving}
-                loading={saving}
-              />
             </div>
+            <Switch
+              checked={settings.require_approval}
+              onCheckedChange={(checked) => handleSettingChange('require_approval', checked)}
+              disabled={!settings.registration_open || saving}
+            />
           </div>
         </div>
       )}

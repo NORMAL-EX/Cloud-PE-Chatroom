@@ -5,8 +5,7 @@
 }
 
 .console-header {
-  background: var(--semi-color-bg-1);
-  border-bottom: 1px solid var(--semi-color-border);
+  border-bottom: 1px solid hsl(var(--border));
   padding: 0 24px;
 }
 
@@ -34,35 +33,26 @@
   gap: 16px;
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  border-left: 1px solid var(--semi-color-border);
-  border-right: 1px solid var(--semi-color-border);
-}
-
 .console-body {
   flex: 1;
   overflow: hidden;
+  display: flex;
 }
 
 .console-sider {
-  background: var(--semi-color-bg-1);
-  border-right: 1px solid var(--semi-color-border);
+  width: 240px;
+  border-right: 1px solid hsl(var(--border));
 }
 
 .console-content {
   overflow-y: auto;
   padding: 24px;
-  background: var(--semi-color-bg-0);
+  flex: 1;
 }
 
 .console-footer {
   padding: 16px 24px;
-  background: var(--semi-color-bg-1);
-  border-top: 1px solid var(--semi-color-border);
+  border-top: 1px solid hsl(var(--border));
   text-align: center;
   display: flex;
   justify-content: center;

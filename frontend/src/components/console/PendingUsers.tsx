@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Typography, Empty, Toast, Popconfirm } from '@douyinfe/semi-ui';
-import { IconCheckCircleStroked, IconMinusCircle, IconInbox } from '@douyinfe/semi-icons';
+import { CheckCircle as XCircle, Inbox } from 'lucide-react';
+import { CheckCircle } from '@/components/icon/CheckCircle';
+import { Button } from '@/components/ui/button';
+import { Table } from '@/components/ui/table';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { toastManager } from '@/components/ui/toast';
+import { AlertDialog, AlertDialogTrigger, AlertDialogPopup, AlertDialogTitle, AlertDialogDescription, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
 import axios from 'axios';
-
-const { Title } = Typography;
 
 interface PendingUser {
   id: string;
@@ -16,6 +19,8 @@ interface PendingUser {
 const PendingUsers: React.FC = () => {
   const [users, setUsers] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionUserId, setActionUserId] = useState<string | null>(null);
+  const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
 
   useEffect(() => {
     loadPendingUsers();
@@ -29,7 +34,7 @@ const PendingUsers: React.FC = () => {
         setUsers(response.data.data);
       }
     } catch (error) {
-      Toast.error('加载待审核用户失败');
+      toastManager.add({ title: '加载待审核用户失败', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -39,111 +44,124 @@ const PendingUsers: React.FC = () => {
     try {
       const response = await axios.post('/api/approve-user', { user_id: userId });
       if (response.data.success) {
-        Toast.success('用户已通过审核');
+        toastManager.add({ title: '用户已通过审核', type: 'success' });
         loadPendingUsers();
       } else {
-        Toast.error(response.data.message);
+        toastManager.add({ title: response.data.message, type: 'error' });
       }
     } catch (error) {
-      Toast.error('操作失败');
+      toastManager.add({ title: '操作失败', type: 'error' });
     }
+    setActionUserId(null);
+    setActionType(null);
   };
 
   const handleReject = async (userId: string) => {
     try {
       const response = await axios.post('/api/reject-user', { user_id: userId });
       if (response.data.success) {
-        Toast.success('用户已拒绝');
+        toastManager.add({ title: '用户已拒绝', type: 'success' });
         loadPendingUsers();
       } else {
-        Toast.error(response.data.message);
+        toastManager.add({ title: response.data.message, type: 'error' });
       }
     } catch (error) {
-      Toast.error('操作失败');
+      toastManager.add({ title: '操作失败', type: 'error' });
     }
+    setActionUserId(null);
+    setActionType(null);
   };
-
-  const columns = [
-    {
-      title: '用户名',
-      dataIndex: 'username',
-      key: 'username',
-    },
-    {
-      title: '邮箱',
-      dataIndex: 'email',
-      key: 'email',
-    },
-    {
-      title: '头像',
-      dataIndex: 'avatar',
-      key: 'avatar',
-      render: (avatar: string) => avatar ? '已设置' : '未设置',
-    },
-    {
-      title: '申请时间',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      render: (date: string) => new Date(date).toLocaleString(),
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      render: (_: any, record: PendingUser) => (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Popconfirm
-            title="确认通过"
-            content="确定要通过该用户的注册申请吗？"
-            onConfirm={() => handleApprove(record.id)}
-          >
-            <Button
-              type="primary"
-              theme="solid"
-              icon={<IconCheckCircleStroked />}
-              size="small"
-            >
-              通过
-            </Button>
-          </Popconfirm>
-          <Popconfirm
-            title="确认拒绝"
-            content="确定要拒绝该用户的注册申请吗？该用户的邮箱将被加入黑名单。"
-            onConfirm={() => handleReject(record.id)}
-          >
-            <Button
-              type="danger"
-              theme="solid"
-              icon={<IconMinusCircle />}
-              size="small"
-            >
-              拒绝
-            </Button>
-          </Popconfirm>
-        </div>
-      ),
-    },
-  ];
 
   return (
     <>
-      <div style={{ marginBottom: 16 }}>
-        <Title heading={4}>待审核用户</Title>
+      <div className="mb-4">
+        <h4 className="text-xl font-semibold">待审核用户</h4>
       </div>
       
       {users.length === 0 && !loading ? (
-        <Empty
-          image= {<IconInbox style={{ fontSize: 50, color: 'var(--semi-color-text-2)' }}/>}
-          title="暂无待审核用户"
-          description="所有注册申请都已处理完毕"
-        />
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia>
+              <Inbox className="h-12 w-12 text-muted-foreground" />
+            </EmptyMedia>
+            <EmptyTitle>暂无待审核用户</EmptyTitle>
+            <EmptyDescription>所有注册申请都已处理完毕</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
-        <Table
-          columns={columns}
-          dataSource={users}
-          rowKey="id"
-          loading={loading}
-          pagination={false}
-        />
+        <div className="rounded-md border">
+          <Table>
+            <thead>
+              <tr>
+                <th>用户名</th>
+                <th>邮箱</th>
+                <th>头像</th>
+                <th>申请时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((record) => (
+                <tr key={record.id}>
+                  <td>{record.username}</td>
+                  <td>{record.email}</td>
+                  <td>{record.avatar ? '已设置' : '未设置'}</td>
+                  <td>{new Date(record.created_at).toLocaleString()}</td>
+                  <td>
+                    <div className="flex gap-2">
+                      <AlertDialog open={actionUserId === record.id && actionType === 'approve'} onOpenChange={(open) => !open && setActionUserId(null)}>
+                        <AlertDialogTrigger render={
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setActionUserId(record.id);
+                              setActionType('approve');
+                            }}
+                          >
+                            <CheckCircle size={16} className="mr-1" />
+                            通过
+                          </Button>
+                        } />
+                        <AlertDialogPopup>
+                          <AlertDialogTitle>确认通过</AlertDialogTitle>
+                          <AlertDialogDescription>确定要通过该用户的注册申请吗？</AlertDialogDescription>
+                          <div className="flex justify-end gap-2 mt-4">
+                            <AlertDialogCancel onClick={() => setActionUserId(null)}>取消</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleApprove(record.id)}>确认</AlertDialogAction>
+                          </div>
+                        </AlertDialogPopup>
+                      </AlertDialog>
+                      
+                      <AlertDialog open={actionUserId === record.id && actionType === 'reject'} onOpenChange={(open) => !open && setActionUserId(null)}>
+                        <AlertDialogTrigger render={
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => {
+                              setActionUserId(record.id);
+                              setActionType('reject');
+                            }}
+                          >
+                            <XCircle className="mr-1 h-4 w-4" />
+                            拒绝
+                          </Button>
+                        } />
+                        <AlertDialogPopup>
+                          <AlertDialogTitle>确认拒绝</AlertDialogTitle>
+                          <AlertDialogDescription>确定要拒绝该用户的注册申请吗？该用户的邮箱将被加入黑名单。</AlertDialogDescription>
+                          <div className="flex justify-end gap-2 mt-4">
+                            <AlertDialogCancel onClick={() => setActionUserId(null)}>取消</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleReject(record.id)}>确认</AlertDialogAction>
+                          </div>
+                        </AlertDialogPopup>
+                      </AlertDialog>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
       )}
     </>
   );
