@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Switch, Typography, Toast, Spin } from '@douyinfe/semi-ui';
+import { Switch } from '@/components/ui/switch';
+import { Spinner } from '@/components/ui/spinner';
+import { showToast } from '@/components/ui/toast';
 import axios from 'axios';
-
-const { Title, Text } = Typography;
 
 interface SystemSettings {
   registration_open: boolean;
@@ -26,7 +26,10 @@ const Settings: React.FC = () => {
         setSettings(response.data.data);
       }
     } catch (error) {
-      Toast.error('加载设置失败');
+      showToast({
+        title: '加载设置失败',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -34,29 +37,38 @@ const Settings: React.FC = () => {
 
   const handleSettingChange = async (field: keyof SystemSettings, value: boolean) => {
     if (!settings) return;
-    
+
     const newSettings = { ...settings, [field]: value };
     setSettings(newSettings);
-    
+
     // 如果关闭了开放注册，同时关闭审核选项
     if (field === 'registration_open' && !value && newSettings.require_approval) {
       newSettings.require_approval = false;
       setSettings(newSettings);
     }
-    
+
     // 自动保存
     setSaving(true);
     try {
       const response = await axios.post('/api/update-settings', newSettings);
       if (response.data.success) {
-        Toast.success('设置已保存');
+        showToast({
+          title: '设置已保存',
+          type: 'success',
+        });
       } else {
-        Toast.error(response.data.message);
+        showToast({
+          title: response.data.message,
+          type: 'error',
+        });
         // 恢复原设置
         loadSettings();
       }
     } catch (error) {
-      Toast.error('保存失败');
+      showToast({
+        title: '保存失败',
+        type: 'error',
+      });
       // 恢复原设置
       loadSettings();
     } finally {
@@ -68,7 +80,7 @@ const Settings: React.FC = () => {
     return (
       <>
         <div style={{ textAlign: 'center', padding: 40 }}>
-          <Spin size="large" />
+          <Spinner className="w-8 h-8" />
         </div>
       </>
     );
@@ -77,40 +89,43 @@ const Settings: React.FC = () => {
   return (
     <>
       <div style={{ marginBottom: 24 }}>
-        <Title heading={4}>系统设置</Title>
+        <h4 style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>系统设置</h4>
       </div>
-      
+
       {settings && (
         <div style={{ maxWidth: 600 }}>
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <Text strong style={{ fontSize: 14 }}>开放注册</Text>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>开放注册</span>
                 <div style={{ marginTop: 4 }}>
-                  <Text type="tertiary" size="small">关闭后，新用户将无法注册</Text>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground, #6b7280)' }}>
+                    关闭后，新用户将无法注册
+                  </span>
                 </div>
               </div>
               <Switch
                 checked={settings.registration_open}
-                onChange={(checked) => handleSettingChange('registration_open', checked)}
-                loading={saving}
+                onCheckedChange={(checked) => handleSettingChange('registration_open', checked)}
+                disabled={saving}
               />
             </div>
           </div>
-          
+
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <Text strong style={{ fontSize: 14 }}>注册需要审核</Text>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>注册需要审核</span>
                 <div style={{ marginTop: 4 }}>
-                  <Text type="tertiary" size="small">开启后，新用户注册后需要管理员审核才能登录</Text>
+                  <span style={{ fontSize: '0.875rem', color: 'var(--muted-foreground, #6b7280)' }}>
+                    开启后，新用户注册后需要管理员审核才能登录
+                  </span>
                 </div>
               </div>
               <Switch
                 checked={settings.require_approval}
-                onChange={(checked) => handleSettingChange('require_approval', checked)}
+                onCheckedChange={(checked) => handleSettingChange('require_approval', checked)}
                 disabled={!settings.registration_open || saving}
-                loading={saving}
               />
             </div>
           </div>

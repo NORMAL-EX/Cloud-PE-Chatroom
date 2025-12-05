@@ -1,15 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout, Typography, Button, Avatar, Dropdown, Modal, Toast, Spin, TextArea, Tag, Form, List, Input } from '@douyinfe/semi-ui';
-import { IconMoon, IconSun, IconSend, IconCopy, IconArrowUp, IconChevronDown } from '@douyinfe/semi-icons';
+import { Moon, Sun, Send, Copy, ArrowUp, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import DOMPurify from 'dompurify';
 import ReactMarkdown from 'react-markdown';
 import axios from 'axios';
 import './Chat.css';
-
-const { Header, Content, Footer } = Layout;
-const { Title, Text } = Typography;
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import {
+  AlertDialog,
+  AlertDialogPopup,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogClose
+} from '@/components/ui/alert-dialog';
+import { showToast } from '@/components/ui/toast';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 
 interface Message {
   id: string;
@@ -75,10 +87,28 @@ const Chat: React.FC = () => {
   const [viewOriginalMessages, setViewOriginalMessages] = useState<Set<string>>(new Set());
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [tempDisplayName, setTempDisplayName] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    isDanger?: boolean;
+  }>({ open: false, title: '', message: '', onConfirm: () => {} });
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    items: Array<{
+      label: string;
+      icon?: React.ReactNode;
+      onClick: () => void;
+      isDanger?: boolean;
+      isSeparator?: boolean;
+    }>;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const textAreaRef = useRef<any>(null);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const lastScrollDirection = useRef<'up' | 'down'>('down');
   const lastScrollTop = useRef(0);
 
@@ -87,9 +117,9 @@ const Chat: React.FC = () => {
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
     };
-    
+
     document.addEventListener('contextmenu', handleContextMenu);
-    
+
     loadMessages();
     loadUsers();
     loadCurrentUser();
@@ -119,16 +149,16 @@ const Chat: React.FC = () => {
     if (user && messages.length > 0) {
       const mentions: MentionItem[] = [];
       const myDisplayName = currentUser?.display_name || user.username;
-      
+
       messages.forEach(msg => {
         // 检查消息中是否包含@我（特殊格式或普通格式）
         const specialMentionRegex = new RegExp(`@\\[${user.id}:[^\\]]+\\]`, 'g');
         const normalMentionRegex1 = new RegExp(`@${myDisplayName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`, 'g');
         const normalMentionRegex2 = new RegExp(`@${user.username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`, 'g');
-        
-        if (!msg.recalled && msg.user_id !== user.id && 
-            (specialMentionRegex.test(msg.content) || 
-             normalMentionRegex1.test(msg.content) || 
+
+        if (!msg.recalled && msg.user_id !== user.id &&
+            (specialMentionRegex.test(msg.content) ||
+             normalMentionRegex1.test(msg.content) ||
              normalMentionRegex2.test(msg.content))) {
           const messageUser = getUserInfo(msg.user_id);
           mentions.push({
@@ -139,12 +169,12 @@ const Chat: React.FC = () => {
           });
         }
       });
-      
+
       setMyMentions(mentions);
-      
+
       // 计算未查看的@消息
       const uncheckedMentions = mentions.filter(m => !checkedMentionIds.has(m.messageId));
-      
+
       // 如果有未查看的@消息，显示提醒
       if (uncheckedMentions.length > 0) {
         setShowMentionAlert(true);
@@ -187,6 +217,13 @@ const Chat: React.FC = () => {
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Close context menu on click
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, []);
+
   const loadMessages = async () => {
     try {
       const response = await axios.get('/api/messages');
@@ -194,7 +231,10 @@ const Chat: React.FC = () => {
         setMessages(response.data.data);
       }
     } catch (error) {
-      Toast.error('加载消息失败');
+      showToast({
+        title: '加载消息失败',
+        type: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -236,7 +276,7 @@ const Chat: React.FC = () => {
   const connectWebSocket = () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws`);
-    
+
     ws.onopen = () => {
       console.log('WebSocket connected');
     };
@@ -244,14 +284,14 @@ const Chat: React.FC = () => {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        
+
         switch (data.event) {
           case 'new_message':
             setMessages(prev => [...prev, data.data]);
             break;
           case 'message_recalled':
-            setMessages(prev => prev.map(msg => 
-              msg.id === data.data.message_id 
+            setMessages(prev => prev.map(msg =>
+              msg.id === data.data.message_id
                 ? { ...msg, recalled: true }
                 : msg
             ));
@@ -264,8 +304,8 @@ const Chat: React.FC = () => {
             break;
           case 'message_recalled_with_data':
             // 新增：处理带有完整数据的撤回消息
-            setMessages(prev => prev.map(msg => 
-              msg.id === data.data.id 
+            setMessages(prev => prev.map(msg =>
+              msg.id === data.data.id
                 ? data.data
                 : msg
             ));
@@ -278,13 +318,19 @@ const Chat: React.FC = () => {
             break;
           case 'user_banned':
             if (data.data.user_id === user?.id) {
-              Toast.error('您已被封禁');
+              showToast({
+                title: '您已被封禁',
+                type: 'error',
+              });
               logout();
             }
             break;
           case 'user_deleted':
             if (data.data.user_id === user?.id) {
-              Toast.error('您的账号已被删除');
+              showToast({
+                title: '您的账号已被删除',
+                type: 'error',
+              });
               logout();
             }
             break;
@@ -295,9 +341,15 @@ const Chat: React.FC = () => {
               loadCurrentUser();
               // 如果是当前用户，显示提示
               if (data.data.new_role === 'DeputyAdmin') {
-                Toast.success('您已被设为次管理员');
+                showToast({
+                  title: '您已被设为次管理员',
+                  type: 'success',
+                });
               } else if (data.data.old_role === 'DeputyAdmin' && data.data.new_role === 'Member') {
-                Toast.info('您的次管理员权限已被取消');
+                showToast({
+                  title: '您的次管理员权限已被取消',
+                  type: 'info',
+                });
               }
             }
             // 重新加载消息以更新角色标签
@@ -354,29 +406,29 @@ const Chat: React.FC = () => {
   const handleViewMentions = async () => {
     // 获取未查看的@消息
     const uncheckedMentions = myMentions.filter(m => !checkedMentionIds.has(m.messageId));
-    
+
     if (uncheckedMentions.length > 0 && currentMentionIndex < uncheckedMentions.length) {
       // 获取当前要查看的@消息
       const currentMention = uncheckedMentions[currentMentionIndex];
-      
+
       // 跳转到该消息
       scrollToMessage(currentMention.messageId);
-      
+
       try {
         // 标记当前这条消息为已查看
         const response = await axios.post('/api/mark-mentions-checked', {
           message_ids: [currentMention.messageId]
         });
-        
+
         if (response.data.success) {
           // 更新本地状态
           const newCheckedIds = new Set(checkedMentionIds);
           newCheckedIds.add(currentMention.messageId);
           setCheckedMentionIds(newCheckedIds);
-          
+
           // 移动到下一条
           setCurrentMentionIndex(currentMentionIndex + 1);
-          
+
           // 如果是最后一条，隐藏按钮
           if (currentMentionIndex + 1 >= uncheckedMentions.length) {
             setShowMentionAlert(false);
@@ -393,26 +445,26 @@ const Chat: React.FC = () => {
   const processMessageContent = (content: string): string => {
     let processedContent = content;
     const allUsers = getAllUsers();
-    
+
     // 匹配所有 @xxx 格式的内容
     const mentionRegex = /@([^\s@]+)/g;
-    
+
     processedContent = processedContent.replace(mentionRegex, (match, mentionedName) => {
       // 查找匹配的用户（通过昵称或用户名）
-      const matchedUser = allUsers.find(u => 
-        (u.display_name && u.display_name === mentionedName) || 
+      const matchedUser = allUsers.find(u =>
+        (u.display_name && u.display_name === mentionedName) ||
         u.username === mentionedName
       );
-      
+
       if (matchedUser) {
         // 转换为特殊格式 @[user_id:display_name]
         const displayName = getDisplayName(matchedUser);
         return `@[${matchedUser.id}:${displayName}]`;
       }
-      
+
       return match;
     });
-    
+
     return processedContent;
   };
 
@@ -423,15 +475,21 @@ const Chat: React.FC = () => {
     try {
       // 处理消息内容，将@提及转换为特殊格式
       const processedContent = processMessageContent(input);
-      
+
       const response = await axios.post('/api/send-message', { content: processedContent });
       if (response.data.success) {
         setInput('');
       } else {
-        Toast.error(response.data.message);
+        showToast({
+          title: response.data.message,
+          type: 'error',
+        });
       }
     } catch (error) {
-      Toast.error('发送失败');
+      showToast({
+        title: '发送失败',
+        type: 'error',
+      });
     } finally {
       setSending(false);
     }
@@ -441,18 +499,30 @@ const Chat: React.FC = () => {
     try {
       const response = await axios.post('/api/recall-message', { message_id: messageId });
       if (!response.data.success) {
-        Toast.error(response.data.message);
+        showToast({
+          title: response.data.message,
+          type: 'error',
+        });
       }
     } catch (error) {
-      Toast.error('撤回失败');
+      showToast({
+        title: '撤回失败',
+        type: 'error',
+      });
     }
   };
 
   const copyMessage = (content: string) => {
     navigator.clipboard.writeText(content).then(() => {
-      Toast.success('已复制到剪贴板');
+      showToast({
+        title: '已复制到剪贴板',
+        type: 'success',
+      });
     }).catch(() => {
-      Toast.error('复制失败');
+      showToast({
+        title: '复制失败',
+        type: 'error',
+      });
     });
   };
 
@@ -467,74 +537,90 @@ const Chat: React.FC = () => {
       let response;
       switch (action) {
         case 'setDeputy':
-          response = await axios.post('/api/set-deputy-admin', { 
-            user_id: targetUserId, 
-            is_deputy: true 
+          response = await axios.post('/api/set-deputy-admin', {
+            user_id: targetUserId,
+            is_deputy: true
           });
           break;
         case 'removeDeputy':
-          response = await axios.post('/api/set-deputy-admin', { 
-            user_id: targetUserId, 
-            is_deputy: false 
+          response = await axios.post('/api/set-deputy-admin', {
+            user_id: targetUserId,
+            is_deputy: false
           });
           break;
         case 'mute10':
-          response = await axios.post('/api/mute-user', { 
-            user_id: targetUserId, 
-            duration_minutes: 10 
+          response = await axios.post('/api/mute-user', {
+            user_id: targetUserId,
+            duration_minutes: 10
           });
           break;
         case 'mute60':
-          response = await axios.post('/api/mute-user', { 
-            user_id: targetUserId, 
-            duration_minutes: 60 
+          response = await axios.post('/api/mute-user', {
+            user_id: targetUserId,
+            duration_minutes: 60
           });
           break;
         case 'mute1440':
-          response = await axios.post('/api/mute-user', { 
-            user_id: targetUserId, 
-            duration_minutes: 1440 
+          response = await axios.post('/api/mute-user', {
+            user_id: targetUserId,
+            duration_minutes: 1440
           });
           break;
         case 'mute43200':
-          response = await axios.post('/api/mute-user', { 
-            user_id: targetUserId, 
-            duration_minutes: 43200 
+          response = await axios.post('/api/mute-user', {
+            user_id: targetUserId,
+            duration_minutes: 43200
           });
           break;
         case 'unmute':
-          response = await axios.post('/api/unmute-user', { 
+          response = await axios.post('/api/unmute-user', {
             user_id: targetUserId
           });
           break;
         case 'ban':
-          Modal.confirm({
+          setConfirmDialog({
+            open: true,
             title: '确认封禁',
-            content: '确定要封禁该用户吗？封禁后用户将被删除且邮箱将被加入黑名单。',
-            onOk: async () => {
-              response = await axios.post('/api/ban-user', { user_id: targetUserId });
-              if (response?.data.success) {
-                Toast.success('用户已封禁');
+            message: '确定要封禁该用户吗？封禁后用户将被删除且邮箱将被加入黑名单。',
+            isDanger: true,
+            onConfirm: async () => {
+              const banResponse = await axios.post('/api/ban-user', { user_id: targetUserId });
+              if (banResponse?.data.success) {
+                showToast({
+                  title: '用户已封禁',
+                  type: 'success',
+                });
                 loadUsers();
                 loadMessages();
               } else {
-                Toast.error(response?.data.message || '操作失败');
+                showToast({
+                  title: banResponse?.data.message || '操作失败',
+                  type: 'error',
+                });
               }
             },
           });
           return;
         case 'delete':
-          Modal.confirm({
+          setConfirmDialog({
+            open: true,
             title: '确认删除',
-            content: '确定要删除该用户吗？',
-            onOk: async () => {
-              response = await axios.post('/api/delete-user', { user_id: targetUserId });
-              if (response?.data.success) {
-                Toast.success('用户已删除');
+            message: '确定要删除该用户吗？',
+            isDanger: true,
+            onConfirm: async () => {
+              const deleteResponse = await axios.post('/api/delete-user', { user_id: targetUserId });
+              if (deleteResponse?.data.success) {
+                showToast({
+                  title: '用户已删除',
+                  type: 'success',
+                });
                 loadUsers();
                 loadMessages();
               } else {
-                Toast.error(response?.data.message || '操作失败');
+                showToast({
+                  title: deleteResponse?.data.message || '操作失败',
+                  type: 'error',
+                });
               }
             },
           });
@@ -542,7 +628,10 @@ const Chat: React.FC = () => {
       }
 
       if (response?.data.success) {
-        Toast.success('操作成功');
+        showToast({
+          title: '操作成功',
+          type: 'success',
+        });
         loadUsers();
         loadMessages();
         // 如果是禁言相关操作，重新加载当前用户信息
@@ -550,31 +639,46 @@ const Chat: React.FC = () => {
           setTimeout(() => loadCurrentUser(), 500);
         }
       } else {
-        Toast.error(response?.data.message || '操作失败');
+        showToast({
+          title: response?.data.message || '操作失败',
+          type: 'error',
+        });
       }
     } catch (error) {
-      Toast.error('操作失败');
+      showToast({
+        title: '操作失败',
+        type: 'error',
+      });
     }
   };
 
   const handleCustomMute = async () => {
     try {
-      const response = await axios.post('/api/mute-user', { 
-        user_id: muteTargetUser, 
-        duration_minutes: customMuteDuration 
+      const response = await axios.post('/api/mute-user', {
+        user_id: muteTargetUser,
+        duration_minutes: customMuteDuration
       });
-      
+
       if (response.data.success) {
-        Toast.success('操作成功');
+        showToast({
+          title: '操作成功',
+          type: 'success',
+        });
         setCustomMuteModalVisible(false);
         loadUsers();
         loadMessages();
         setTimeout(() => loadCurrentUser(), 500);
       } else {
-        Toast.error(response.data.message);
+        showToast({
+          title: response.data.message,
+          type: 'error',
+        });
       }
     } catch (error) {
-      Toast.error('操作失败');
+      showToast({
+        title: '操作失败',
+        type: 'error',
+      });
     }
   };
 
@@ -582,121 +686,113 @@ const Chat: React.FC = () => {
     // 优先从users列表中查找
     const userFromList = users.find((u: User) => u.id === userId);
     if (userFromList) return userFromList;
-    
+
     // 如果是当前用户
     if (currentUser?.id === userId) return currentUser;
     if (user?.id === userId) return user as User;
-    
+
     // 从消息中查找用户信息
     const messageWithUser = messages.find((msg: Message) => msg.user_id === userId && msg.user);
     if (messageWithUser?.user) return messageWithUser.user as User;
-    
+
     return null;
   };
 
   const getAllUsers = (): User[] => {
     const userMap = new Map<string, User>();
-    
+
     // 添加users列表中的用户
     users.forEach(u => userMap.set(u.id, u));
-    
+
     // 添加当前用户
     if (currentUser) userMap.set(currentUser.id, currentUser);
     if (user && !userMap.has(user.id)) userMap.set(user.id, user as User);
-    
+
     // 从消息中提取用户
     messages.forEach(msg => {
       if (msg.user && !userMap.has(msg.user.id)) {
         userMap.set(msg.user.id, msg.user as User);
       }
     });
-    
+
     return Array.from(userMap.values());
   };
 
   const getAvatar = (userInfo: User | null) => {
     if (userInfo?.avatar) {
       return (
-        <Avatar 
-          src={userInfo.avatar} 
-          size="small"
-          style={{ flexShrink: 0 }}
-        />
+        <Avatar className="flex-shrink-0">
+          <AvatarImage src={userInfo.avatar} alt={userInfo.username} />
+          <AvatarFallback>{userInfo.username[0].toUpperCase()}</AvatarFallback>
+        </Avatar>
       );
     }
-    
+
     const name = userInfo?.username || '?';
     const firstChar = name[0].toUpperCase();
     const colors = [
-      '--semi-color-primary',
-      '--semi-color-success',
-      '--semi-color-warning',
-      '--semi-color-danger',
-      '--semi-color-tertiary',
+      'hsl(var(--primary))',
+      'hsl(var(--success))',
+      'hsl(var(--warning))',
+      'hsl(var(--destructive))',
+      'hsl(var(--muted))',
     ];
     const colorIndex = name.charCodeAt(0) % colors.length;
-    
+
     return (
-      <Avatar 
-        size="small" 
-        style={{ 
-          backgroundColor: `var(${colors[colorIndex]})`,
-          color: 'white',
-          flexShrink: 0
-        }}
-      >
-        {firstChar}
+      <Avatar className="flex-shrink-0" style={{ backgroundColor: colors[colorIndex], color: 'white' }}>
+        <AvatarFallback>{firstChar}</AvatarFallback>
       </Avatar>
     );
   };
 
   const canManageUser = (targetUser: User | null) => {
     if (!user || !targetUser) return false;
-    
+
     // 不能管理自己
     if (user.id === targetUser.id) return false;
-    
+
     // 管理员可以管理所有人（除了自己）
     if (user.role === 'Admin') return true;
-    
+
     // 次管理员只能管理普通成员
     if (user.role === 'DeputyAdmin' && targetUser.role === 'Member') return true;
-    
+
     return false;
   };
 
   const canEditDisplayName = (targetUser: User | null) => {
     if (!user || !targetUser) return false;
-    
+
     // 可以编辑自己的昵称
     if (user.id === targetUser.id) return true;
-    
+
     // 管理员可以编辑次管理员和普通成员的昵称
     if (user.role === 'Admin' && (targetUser.role === 'DeputyAdmin' || targetUser.role === 'Member')) return true;
-    
+
     // 次管理员可以编辑普通成员的昵称
     if (user.role === 'DeputyAdmin' && targetUser.role === 'Member') return true;
-    
+
     return false;
   };
 
   const getMutedInfo = () => {
     if (!currentUser?.muted_until) return null;
-    
+
     const mutedUntil = new Date(currentUser.muted_until);
     const now = new Date();
-    
+
     if (mutedUntil <= now) return null;
-    
+
     const diffMs = mutedUntil.getTime() - now.getTime();
     const diffMins = Math.ceil(diffMs / 60000);
-    
+
     if (diffMins > 60) {
       const hours = Math.floor(diffMins / 60);
       const mins = diffMins % 60;
       return `您已被禁言，剩余时间：${hours}小时${mins}分钟`;
     }
-    
+
     return `您已被禁言，剩余时间：${diffMins}分钟`;
   };
 
@@ -710,19 +806,20 @@ const Chat: React.FC = () => {
     return new Date(targetUser.muted_until) > new Date();
   };
 
-  const handleInputChange = (value: string) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
     setInput(value);
-    
+
     // 检测@符号
     const lastAtIndex = value.lastIndexOf('@');
     if (lastAtIndex !== -1) {
       const textAfterAt = value.substring(lastAtIndex + 1);
-      
+
       // 检查@后面是否有空格，如果有空格说明@已经完成
       if (!textAfterAt.includes(' ')) {
         setMentionSearch(textAfterAt.toLowerCase());
         setShowMentionList(true);
-        
+
         // 获取光标位置
         if (textAreaRef.current) {
           // 简单计算位置
@@ -744,16 +841,16 @@ const Chat: React.FC = () => {
     if (lastAtIndex !== -1) {
       const beforeAt = input.substring(0, lastAtIndex);
       const afterAt = input.substring(lastAtIndex + 1);
-      
+
       // 找到@后面的第一个空格或结尾
       const spaceIndex = afterAt.indexOf(' ');
       const restText = spaceIndex !== -1 ? afterAt.substring(spaceIndex) : '';
-      
+
       // 使用显示名称而不是用户名
       const displayName = getDisplayName(selectedUser);
       setInput(`${beforeAt}@${displayName} ${restText}`);
       setShowMentionList(false);
-      
+
       // 聚焦输入框
       if (textAreaRef.current) {
         textAreaRef.current.focus();
@@ -780,39 +877,60 @@ const Chat: React.FC = () => {
         user_id: userId,
         display_name: newDisplayName
       });
-      
+
       if (response.data.success) {
-        Toast.success('昵称已更新');
+        showToast({
+          title: '昵称已更新',
+          type: 'success',
+        });
         setEditingMessageId(null);
         loadCurrentUser();
       } else {
-        Toast.error(response.data.message);
+        showToast({
+          title: response.data.message,
+          type: 'error',
+        });
       }
     } catch (error) {
-      Toast.error('更新失败');
+      showToast({
+        title: '更新失败',
+        type: 'error',
+      });
     }
   };
 
   const handleDeleteAccount = async () => {
-    Modal.confirm({
+    setConfirmDialog({
+      open: true,
       title: '确认注销账号',
-      content: '您确定要注销账号吗？注销后所有数据将被删除且无法恢复。',
-      onOk: () => {
-        Modal.confirm({
+      message: '您确定要注销账号吗？注销后所有数据将被删除且无法恢复。',
+      isDanger: true,
+      onConfirm: () => {
+        setConfirmDialog({
+          open: true,
           title: '再次确认',
-          content: '请再次确认，您真的要注销账号吗？此操作不可撤销！',
-          okType: 'danger',
-          onOk: async () => {
+          message: '请再次确认，您真的要注销账号吗？此操作不可撤销！',
+          isDanger: true,
+          onConfirm: async () => {
             try {
               const response = await axios.post('/api/delete-account');
               if (response.data.success) {
-                Toast.success('账号已注销');
+                showToast({
+                  title: '账号已注销',
+                  type: 'success',
+                });
                 logout();
               } else {
-                Toast.error(response.data.message);
+                showToast({
+                  title: response.data.message,
+                  type: 'error',
+                });
               }
             } catch (error) {
-              Toast.error('操作失败');
+              showToast({
+                title: '操作失败',
+                type: 'error',
+              });
             }
           }
         });
@@ -823,7 +941,7 @@ const Chat: React.FC = () => {
   const renderMessageContent = (content: string) => {
     // 先处理特殊格式的@提及，将其转换为当前昵称
     let processedContent = content;
-    
+
     // 匹配 @[user_id:old_display_name] 格式
     const specialMentionRegex = /@\[([^:]+):([^\]]+)\]/g;
     processedContent = processedContent.replace(specialMentionRegex, (_match, userId, oldDisplayName) => {
@@ -834,11 +952,11 @@ const Chat: React.FC = () => {
       // 如果用户不存在了，显示原来的昵称
       return `@${oldDisplayName}`;
     });
-    
+
     // 检查是否包含HTML标签（排除Markdown链接）
     const htmlTagRegex = /<(?!https?:\/\/)[^>]+>/;
     const hasHtmlTags = htmlTagRegex.test(processedContent);
-    
+
     if (hasHtmlTags) {
       // HTML模式：直接处理HTML内容
       // 处理@提及 - 匹配所有用户的昵称和用户名
@@ -846,21 +964,21 @@ const Chat: React.FC = () => {
       allUsers.forEach(u => {
         const displayName = u.display_name || u.username;
         const username = u.username;
-        
+
         // 替换@昵称
         const displayNameRegex = new RegExp(`@${displayName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`, 'g');
         processedContent = processedContent.replace(displayNameRegex, `<span class="mention-highlight">@${displayName}</span>`);
-        
+
         // 如果昵称和用户名不同，也替换@用户名
         if (displayName !== username) {
           const usernameRegex = new RegExp(`@${username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`, 'g');
           processedContent = processedContent.replace(usernameRegex, `<span class="mention-highlight">@${displayName}</span>`);
         }
       });
-      
+
       // 清理HTML
       const config = {
-        ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
+        ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p', 'br', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
                        'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'img', 'table', 'thead', 'tbody', 'tr', 'td', 'th',
                        'font', 'center', 'hr', 'sub', 'sup', 'u', 's', 'del', 'ins', 'mark', 'small', 'big'],
         ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'class', 'id', 'target', 'rel', 'width', 'height', 'color', 'size', 'face', 'align'],
@@ -870,11 +988,11 @@ const Chat: React.FC = () => {
         FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'style'],
         FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onmouseout', 'onmouseenter', 'onmouseleave']
       };
-      
+
       const sanitizedContent = DOMPurify.sanitize(processedContent, config);
-      
+
       return (
-        <div 
+        <div
           className="message-html-content"
           dangerouslySetInnerHTML={{ __html: sanitizedContent }}
         />
@@ -893,26 +1011,26 @@ const Chat: React.FC = () => {
                       const parts: React.ReactNode[] = [];
                       let lastIndex = 0;
                       const allUsers = getAllUsers();
-                      
+
                       // 创建一个包含所有可能@的正则表达式
                       const mentionRegex = /@([^\s@]+)/g;
                       let match;
-                      
+
                       while ((match = mentionRegex.exec(child)) !== null) {
                         const mentionedName = match[1];
-                        
+
                         // 查找匹配的用户（通过昵称或用户名）
-                        const matchedUser = allUsers.find(u => 
-                          (u.display_name && u.display_name === mentionedName) || 
+                        const matchedUser = allUsers.find(u =>
+                          (u.display_name && u.display_name === mentionedName) ||
                           u.username === mentionedName
                         );
-                        
+
                         if (matchedUser) {
                           // 添加@之前的文本
                           if (match.index > lastIndex) {
                             parts.push(child.substring(lastIndex, match.index));
                           }
-                          
+
                           // 添加高亮的@提及（使用显示名称）
                           const displayName = getDisplayName(matchedUser);
                           parts.push(
@@ -920,22 +1038,22 @@ const Chat: React.FC = () => {
                               @{displayName}
                             </span>
                           );
-                          
+
                           lastIndex = match.index + match[0].length;
                         }
                       }
-                      
+
                       // 添加剩余的文本
                       if (lastIndex < child.length) {
                         parts.push(child.substring(lastIndex));
                       }
-                      
+
                       return parts.length > 0 ? parts : child;
                     }
                     return child;
                   });
                 };
-                
+
                 return <p style={{ margin: '4px 0' }}>{processChildren(children)}</p>;
               },
               strong: ({ children }) => {
@@ -946,34 +1064,34 @@ const Chat: React.FC = () => {
                   const allUsers = getAllUsers();
                   const mentionRegex = /@([^\s@]+)/g;
                   let match;
-                  
+
                   while ((match = mentionRegex.exec(children)) !== null) {
                     const mentionedName = match[1];
-                    const matchedUser = allUsers.find(u => 
-                      (u.display_name && u.display_name === mentionedName) || 
+                    const matchedUser = allUsers.find(u =>
+                      (u.display_name && u.display_name === mentionedName) ||
                       u.username === mentionedName
                     );
-                    
+
                     if (matchedUser) {
                       if (match.index > lastIndex) {
                         parts.push(children.substring(lastIndex, match.index));
                       }
-                      
+
                       const displayName = getDisplayName(matchedUser);
                       parts.push(
                         <span key={`mention-${match.index}`} className="mention-highlight">
                           @{displayName}
                         </span>
                       );
-                      
+
                       lastIndex = match.index + match[0].length;
                     }
                   }
-                  
+
                   if (lastIndex < children.length) {
                     parts.push(children.substring(lastIndex));
                   }
-                  
+
                   return <strong>{parts.length > 0 ? parts : children}</strong>;
                 }
                 return <strong>{children}</strong>;
@@ -986,34 +1104,34 @@ const Chat: React.FC = () => {
                   const allUsers = getAllUsers();
                   const mentionRegex = /@([^\s@]+)/g;
                   let match;
-                  
+
                   while ((match = mentionRegex.exec(children)) !== null) {
                     const mentionedName = match[1];
-                    const matchedUser = allUsers.find(u => 
-                      (u.display_name && u.display_name === mentionedName) || 
+                    const matchedUser = allUsers.find(u =>
+                      (u.display_name && u.display_name === mentionedName) ||
                       u.username === mentionedName
                     );
-                    
+
                     if (matchedUser) {
                       if (match.index > lastIndex) {
                         parts.push(children.substring(lastIndex, match.index));
                       }
-                      
+
                       const displayName = getDisplayName(matchedUser);
                       parts.push(
                         <span key={`mention-${match.index}`} className="mention-highlight">
                           @{displayName}
                         </span>
                       );
-                      
+
                       lastIndex = match.index + match[0].length;
                     }
                   }
-                  
+
                   if (lastIndex < children.length) {
                     parts.push(children.substring(lastIndex));
                   }
-                  
+
                   return <em>{parts.length > 0 ? parts : children}</em>;
                 }
                 return <em>{children}</em>;
@@ -1039,9 +1157,9 @@ const Chat: React.FC = () => {
               ol: ({ children }) => <ol style={{ margin: '8px 0', paddingLeft: '20px' }}>{children}</ol>,
               li: ({ children }) => <li style={{ margin: '4px 0' }}>{children}</li>,
               blockquote: ({ children }) => (
-                <blockquote style={{ 
-                  margin: '8px 0', 
-                  paddingLeft: '12px', 
+                <blockquote style={{
+                  margin: '8px 0',
+                  paddingLeft: '12px',
                   borderLeft: '3px solid var(--semi-color-border)',
                   color: 'var(--semi-color-text-2)'
                 }}>
@@ -1069,10 +1187,131 @@ const Chat: React.FC = () => {
     });
   };
 
+  const showUserContextMenu = (e: React.MouseEvent, messageUser: User) => {
+    e.preventDefault();
+    const items: Array<{
+      label: string;
+      icon?: React.ReactNode;
+      onClick: () => void;
+      isDanger?: boolean;
+      isSeparator?: boolean;
+    }> = [];
+
+    // 权限管理
+    if (user?.role === 'Admin' && messageUser) {
+      if (messageUser.role === 'Member') {
+        items.push({
+          label: '设为次管理员',
+          onClick: () => handleUserAction(messageUser.id, 'setDeputy')
+        });
+      }
+      if (messageUser.role === 'DeputyAdmin') {
+        items.push({
+          label: '取消次管理员',
+          onClick: () => handleUserAction(messageUser.id, 'removeDeputy')
+        });
+      }
+    }
+
+    // 禁言选项
+    if (messageUser) {
+      if (isUserMuted(messageUser)) {
+        items.push({
+          label: '解除禁言',
+          onClick: () => handleUserAction(messageUser.id, 'unmute')
+        });
+      } else {
+        items.push(
+          {
+            label: '禁言10分钟',
+            onClick: () => handleUserAction(messageUser.id, 'mute10')
+          },
+          {
+            label: '禁言1小时',
+            onClick: () => handleUserAction(messageUser.id, 'mute60')
+          },
+          {
+            label: '禁言1天',
+            onClick: () => handleUserAction(messageUser.id, 'mute1440')
+          },
+          {
+            label: '禁言30天',
+            onClick: () => handleUserAction(messageUser.id, 'mute43200')
+          },
+          {
+            label: '自定义时间',
+            onClick: () => handleUserAction(messageUser.id, 'muteCustom')
+          }
+        );
+      }
+    }
+
+    items.push({ label: '', isSeparator: true, onClick: () => {} });
+
+    // 危险操作
+    if (messageUser) {
+      items.push({
+        label: '封禁',
+        isDanger: true,
+        onClick: () => handleUserAction(messageUser.id, 'ban')
+      });
+      if (user?.role === 'Admin') {
+        items.push({
+          label: '删除用户',
+          isDanger: true,
+          onClick: () => handleUserAction(messageUser.id, 'delete')
+        });
+      }
+    }
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items
+    });
+  };
+
+  const showMessageContextMenu = (e: React.MouseEvent, message: Message, messageUser: User | null, showOriginal: boolean) => {
+    e.preventDefault();
+    const items: Array<{
+      label: string;
+      icon?: React.ReactNode;
+      onClick: () => void;
+      isDanger?: boolean;
+      isSeparator?: boolean;
+    }> = [];
+
+    // 复制消息
+    if (!message.recalled || (message.recalled && showOriginal && message.original_content)) {
+      items.push({
+        label: '复制',
+        icon: <Copy className="w-4 h-4" />,
+        onClick: () => copyMessage(showOriginal && message.original_content ? message.original_content : message.content)
+      });
+    }
+
+    // 撤回消息选项
+    if (!message.recalled && (message.user_id === user?.id ||
+      (user?.role === 'Admin') ||
+      (user?.role === 'DeputyAdmin' && messageUser?.role !== 'Admin'))) {
+      items.push({ label: '', isSeparator: true, onClick: () => {} });
+      items.push({
+        label: '撤回',
+        onClick: () => recallMessage(message.id)
+      });
+    }
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items
+    });
+  };
+
   if (loading) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" />
+        <Spinner className="w-8 h-8" />
       </div>
     );
   }
@@ -1089,141 +1328,99 @@ const Chat: React.FC = () => {
   const uncheckedMentionsCount = myMentions.filter(m => !checkedMentionIds.has(m.messageId)).length;
 
   return (
-    <Layout className="chat-layout">
-      <Header className="chat-header">
+    <div className="chat-layout">
+      <header className="chat-header">
         <div className="header-left">
           <img src="https://p1.cloud-pe.cn/cloud-pe.png" alt="Cloud-PE" className="header-logo" />
-          <Title heading={4} style={{ margin: 0 }}>Cloud-PE 项目交流群</Title>
+          <h4 style={{ margin: 0 }}>Cloud-PE 项目交流群</h4>
         </div>
         <div className="header-right">
           <Button
-            theme="borderless"
-            icon={theme === 'light' ? <IconMoon /> : <IconSun />}
+            variant="ghost"
+            size="icon"
             onClick={toggleTheme}
-          />
-          <Dropdown
-            render={
-              <Dropdown.Menu>
-                <Dropdown.Item disabled style={{ cursor: 'default' }}>
-                  <Text strong>{user?.username}</Text>
-                </Dropdown.Item>
-                <Dropdown.Divider />
-                {user?.role === 'Admin' && (
-                  <>
-                    <Dropdown.Item onClick={() => window.open('/console', '_blank')}>
-                      管理后台
-                    </Dropdown.Item>
-                  </>
-                )}
-                {user?.role !== 'Admin' && (
-                  <>
-                    <Dropdown.Item onClick={handleDeleteAccount}>注销账号</Dropdown.Item>
-                  </>
-                )}
-                <Dropdown.Item onClick={logout}>退出登录</Dropdown.Item>
-              </Dropdown.Menu>
-            }
+          >
+            {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+          </Button>
+          <div
+            onContextMenu={(e) => {
+              e.preventDefault();
+              const items: Array<{
+                label: string;
+                icon?: React.ReactNode;
+                onClick: () => void;
+                isDanger?: boolean;
+                isSeparator?: boolean;
+              }> = [
+                {
+                  label: user?.username || '',
+                  onClick: () => {}
+                },
+                { label: '', isSeparator: true, onClick: () => {} }
+              ];
+
+              if (user?.role === 'Admin') {
+                items.push({
+                  label: '管理后台',
+                  onClick: () => window.open('/console', '_blank')
+                });
+              }
+
+              if (user?.role !== 'Admin') {
+                items.push({
+                  label: '注销账号',
+                  onClick: handleDeleteAccount
+                });
+              }
+
+              items.push({
+                label: '退出登录',
+                onClick: logout
+              });
+
+              setContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                items
+              });
+            }}
           >
             {getAvatar(user)}
-          </Dropdown>
+          </div>
         </div>
-      </Header>
+      </header>
 
-      <Content className="chat-content">
+      <main className="chat-content">
         <div className="messages-container" ref={messagesContainerRef}>
           {messages.map((message) => {
             const messageUser = getUserInfo(message.user_id);
             const isOwn = message.user_id === user?.id;
             const showOriginal = viewOriginalMessages.has(message.id);
             const isEditingThisMessage = editingMessageId === message.id;
-            
+
             return (
               <div key={message.id} id={`message-${message.id}`} className={`message ${isOwn ? 'own' : ''}`}>
                 <div className="message-header">
                   {canManageUser(messageUser) ? (
-                    <Dropdown
-                      trigger="contextMenu"
-                      position="bottomLeft"
-                      clickToHide={true}
-                      render={
-                        <Dropdown.Menu>
-                          {/* 权限管理 */}
-                          {user?.role === 'Admin' && messageUser && (
-                            <>
-                              {messageUser.role === 'Member' && (
-                                <Dropdown.Item onClick={() => handleUserAction(messageUser.id, 'setDeputy')}>
-                                  设为次管理员
-                                </Dropdown.Item>
-                              )}
-                              {messageUser.role === 'DeputyAdmin' && (
-                                <Dropdown.Item onClick={() => handleUserAction(messageUser.id, 'removeDeputy')}>
-                                  取消次管理员
-                                </Dropdown.Item>
-                              )}
-                            </>
-                          )}
-                          
-                          {/* 禁言选项 */}
-                          {messageUser && (
-                            isUserMuted(messageUser) ? (
-                              <Dropdown.Item onClick={() => handleUserAction(messageUser.id, 'unmute')}>
-                                解除禁言
-                              </Dropdown.Item>
-                            ) : (
-                              <>
-                                <Dropdown.Item onClick={() => handleUserAction(messageUser.id, 'mute10')}>
-                                  禁言10分钟
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => handleUserAction(messageUser.id, 'mute60')}>
-                                  禁言1小时
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => handleUserAction(messageUser.id, 'mute1440')}>
-                                  禁言1天
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => handleUserAction(messageUser.id, 'mute43200')}>
-                                  禁言30天
-                                </Dropdown.Item>
-                                <Dropdown.Item onClick={() => handleUserAction(messageUser.id, 'muteCustom')}>
-                                  自定义时间
-                                </Dropdown.Item>
-                              </>
-                            )
-                          )}
-                          
-                          <Dropdown.Divider />
-                          
-                          {/* 危险操作 */}
-                          {messageUser && (
-                            <>
-                              <Dropdown.Item type="danger" onClick={() => handleUserAction(messageUser.id, 'ban')}>
-                                封禁
-                              </Dropdown.Item>
-                              {user?.role === 'Admin' && (
-                                <Dropdown.Item type="danger" onClick={() => handleUserAction(messageUser.id, 'delete')}>
-                                  删除用户
-                                </Dropdown.Item>
-                              )}
-                            </>
-                          )}
-                        </Dropdown.Menu>
-                      }
+                    <div
+                      style={{ display: 'flex', alignItems: 'center' }}
+                      onContextMenu={(e) => messageUser && showUserContextMenu(e, messageUser)}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        {getAvatar(messageUser)}
-                      </div>
-                    </Dropdown>
+                      {getAvatar(messageUser)}
+                    </div>
                   ) : (
                     getAvatar(messageUser)
                   )}
                   {isEditingThisMessage ? (
                     <Input
-                      size="small"
                       defaultValue={messageUser?.display_name || messageUser?.username}
-                      style={{ width: 120, marginLeft: 8, marginRight: 8 }}
-                      onChange={(value) => setTempDisplayName(value)}
-                      onEnterPress={(e) => {
-                        e.preventDefault();
-                        handleUpdateDisplayName(messageUser?.id || '');
+                      className="w-30 mx-2"
+                      onChange={(e) => setTempDisplayName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleUpdateDisplayName(messageUser?.id || '');
+                        }
                       }}
                       onBlur={() => {
                         setEditingMessageId(null);
@@ -1231,9 +1428,8 @@ const Chat: React.FC = () => {
                       autoFocus
                     />
                   ) : (
-                    <Text 
-                      strong 
-                      className="message-username"
+                    <span
+                      className="message-username font-semibold"
                       onDoubleClick={() => {
                         if (canEditDisplayName(messageUser)) {
                           setEditingMessageId(message.id);
@@ -1243,79 +1439,50 @@ const Chat: React.FC = () => {
                       style={{ cursor: canEditDisplayName(messageUser) ? 'pointer' : 'default' }}
                     >
                       {getDisplayName(messageUser)}
-                    </Text>
+                    </span>
                   )}
                   {messageUser?.role === 'Admin' && (
-                    <Tag 
-                      size="small"
+                    <Badge
                       style={{ backgroundColor: 'var(--admin-tag-background)', color: 'var(--admin-tag-color)', borderColor: 'var(--admin-tag-background)' }}
-                    >管理员</Tag>
+                    >管理员</Badge>
                   )}
                   {messageUser?.role === 'DeputyAdmin' && (
-                    <Tag color="green" size="small">次管理员</Tag>
+                    <Badge variant="success">次管理员</Badge>
                   )}
                   {isUserMuted(messageUser) && (
-                    <Tag color="grey" size="small">已禁言</Tag>
+                    <Badge variant="secondary">已禁言</Badge>
                   )}
-                  <Text type="tertiary" size="small">
+                  <span className="text-muted-foreground text-sm">
                     {new Date(message.timestamp).toLocaleString()}
-                  </Text>
+                  </span>
                 </div>
-                <Dropdown
-                  trigger="contextMenu"
-                  position="bottomLeft"
-                  clickToHide={true}
-                  render={
-                    <Dropdown.Menu>
-                      {/* 复制消息 */}
-                      {(!message.recalled || (message.recalled && showOriginal && message.original_content)) && (
-                        <Dropdown.Item 
-                          icon={<IconCopy />}
-                          onClick={() => copyMessage(showOriginal && message.original_content ? message.original_content : message.content)}
-                        >
-                          复制
-                        </Dropdown.Item>
-                      )}
-                      
-                      {/* 撤回消息选项 */}
-                      {!message.recalled && (message.user_id === user?.id || 
-                        (user?.role === 'Admin') ||
-                        (user?.role === 'DeputyAdmin' && messageUser?.role !== 'Admin')) && (
-                        <>
-                          <Dropdown.Divider />
-                          <Dropdown.Item onClick={() => recallMessage(message.id)}>
-                            撤回
-                          </Dropdown.Item>
-                        </>
-                      )}
-                    </Dropdown.Menu>
-                  }
+                <div
+                  className="message-content"
+                  onContextMenu={(e) => showMessageContextMenu(e, message, messageUser, showOriginal)}
                 >
-                  <div className="message-content">
-                    {message.recalled ? (
-                      user?.role === 'Admin' && message.original_content ? (
-                        <Text type="tertiary" disabled>
-                          原消息已被撤回{' '}
-                          <span 
-                            className="view-original-link"
-                            onClick={() => toggleViewOriginal(message.id)}
-                          >
-                            {showOriginal ? '隐藏原消息' : '查看原消息'}
-                          </span>
-                        </Text>
-                      ) : (
-                        <Text type="tertiary" disabled>原消息已被撤回</Text>
-                      )
-                    ) : null}
-                    {!message.recalled || (message.recalled && showOriginal && message.original_content) ? (
-                      <div className="message-text">
-                        {renderMessageContent(
-                          showOriginal && message.original_content ? message.original_content : message.content
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                </Dropdown>
+                  {message.recalled ? (
+                    user?.role === 'Admin' && message.original_content ? (
+                      <span className="text-muted-foreground">
+                        原消息已被撤回{' '}
+                        <span
+                          className="view-original-link"
+                          onClick={() => toggleViewOriginal(message.id)}
+                        >
+                          {showOriginal ? '隐藏原消息' : '查看原消息'}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">原消息已被撤回</span>
+                    )
+                  ) : null}
+                  {!message.recalled || (message.recalled && showOriginal && message.original_content) ? (
+                    <div className="message-text">
+                      {renderMessageContent(
+                        showOriginal && message.original_content ? message.original_content : message.content
+                      )}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             );
           })}
@@ -1326,36 +1493,35 @@ const Chat: React.FC = () => {
         {showScrollToBottom && (
           <Button
             className="scroll-to-bottom-btn"
-            icon={<IconChevronDown />}
-            theme="solid"
-            type="primary"
+            size="icon"
             onClick={scrollToBottom}
-          />
+          >
+            <ChevronDown className="w-5 h-5" />
+          </Button>
         )}
-      </Content>
+      </main>
 
-      <Footer className="chat-footer">
+      <footer className="chat-footer">
         {showMentionAlert && uncheckedMentionsCount > 0 && (
           <div style={{ marginBottom: 8 }}>
             <Button
-              theme="light"
-              icon={<IconArrowUp />}
+              variant="secondary"
               onClick={handleViewMentions}
-              style={{ width: '100%' }}
+              className="w-full"
             >
+              <ArrowUp className="w-4 h-4 mr-2" />
               看看你被谁@了 ({uncheckedMentionsCount}条)
             </Button>
           </div>
         )}
         <div className="input-container" style={{ position: 'relative' }}>
-          <TextArea
+          <Textarea
             ref={textAreaRef}
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder={getMutedInfo() || "输入消息... (支持HTML，Enter 发送，Shift+Enter 换行)"}
             disabled={sending || isMuted()}
-            autosize={{ minRows: 1, maxRows: 4 }}
             style={{ minHeight: '40px' }}
           />
           {showMentionList && (
@@ -1372,12 +1538,12 @@ const Chat: React.FC = () => {
               zIndex: 1000,
               minWidth: 200
             }}>
-              <List
-                dataSource={filteredUsers}
-                renderItem={item => (
-                  <List.Item
-                    style={{ 
-                      padding: '8px 12px', 
+              {filteredUsers.length > 0 ? (
+                filteredUsers.map(item => (
+                  <div
+                    key={item.id}
+                    style={{
+                      padding: '8px 12px',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -1392,77 +1558,159 @@ const Chat: React.FC = () => {
                     }}
                   >
                     {getAvatar(item)}
-                    <Text>{getDisplayName(item)}</Text>
-                  </List.Item>
-                )}
-                emptyContent={<div style={{ padding: '8px 12px', color: 'var(--semi-color-text-2)' }}>没有找到用户</div>}
-              />
+                    <span>{getDisplayName(item)}</span>
+                  </div>
+                ))
+              ) : (
+                <div style={{ padding: '8px 12px', color: 'var(--semi-color-text-2)' }}>没有找到用户</div>
+              )}
             </div>
           )}
           <Button
-            theme="solid"
-            type="primary"
-            icon={<IconSend />}
+            size="lg"
             onClick={sendMessage}
-            loading={sending}
-            disabled={!input.trim() || isMuted()}
-            size="large"
+            disabled={!input.trim() || isMuted() || sending}
             style={{ height: '40px' }}
-          />
+          >
+            <Send className="w-5 h-5" />
+          </Button>
         </div>
         {getMutedInfo() && (
           <div style={{ padding: '8px 0', textAlign: 'center' }}>
-            <Text type="danger">{getMutedInfo()}</Text>
+            <span className="text-destructive">{getMutedInfo()}</span>
           </div>
         )}
         <div className="footer-info">
-          <Text type="tertiary" size="small">© 2025 Cloud-PE Team.</Text>
-          <Text type="tertiary" size="small">
-            <a 
-              href="https://beian.miit.gov.cn/#/Integrated/index" 
-              target="_blank" 
+          <span className="text-muted-foreground text-sm">© 2025 Cloud-PE Team.</span>
+          <span className="text-muted-foreground text-sm">
+            <a
+              href="https://beian.miit.gov.cn/#/Integrated/index"
+              target="_blank"
               rel="noopener noreferrer"
               style={{ color: 'inherit', textDecoration: 'none' }}
             >
               鲁ICP备2023028944号
             </a>
-          </Text>
+          </span>
         </div>
-      </Footer>
+      </footer>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            background: 'var(--semi-color-bg-2)',
+            border: '1px solid var(--semi-color-border)',
+            borderRadius: 'var(--semi-border-radius-medium)',
+            boxShadow: 'var(--semi-shadow-elevated)',
+            zIndex: 9999,
+            minWidth: 150
+          }}
+        >
+          {contextMenu.items.map((item, index) => (
+            item.isSeparator ? (
+              <div key={index} style={{ height: 1, background: 'var(--semi-color-border)', margin: '4px 0' }} />
+            ) : (
+              <div
+                key={index}
+                onClick={() => {
+                  item.onClick();
+                  setContextMenu(null);
+                }}
+                style={{
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  color: item.isDanger ? 'var(--semi-color-danger)' : 'inherit'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--semi-color-fill-0)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                {item.icon}
+                {item.label}
+              </div>
+            )
+          ))}
+        </div>
+      )}
 
       {/* 自定义禁言时间模态框 */}
-      <Modal
-        title="自定义禁言时间"
-        visible={customMuteModalVisible}
-        onCancel={() => setCustomMuteModalVisible(false)}
-        onOk={handleCustomMute}
-      >
-        <Form>
-          <Form.InputNumber
-            field="duration"
-            label="禁言时长（分钟）"
-            initValue={customMuteDuration}
-            onChange={(value) => setCustomMuteDuration(value as number)}
-            min={1}
-            max={43200}
-            style={{ width: '100%' }}
-          />
-          <div style={{ marginTop: 8, color: 'var(--semi-color-text-2)' }}>
-            <Text size="small">最少1分钟，最多30天（43200分钟）</Text>
-            <br />
-            <Text size="small">
-              当前设置：
-              {customMuteDuration >= 1440 
-                ? `${Math.floor(customMuteDuration / 1440)}天${customMuteDuration % 1440 ? `${Math.floor((customMuteDuration % 1440) / 60)}小时${customMuteDuration % 60}分钟` : ''}`
-                : customMuteDuration >= 60 
-                  ? `${Math.floor(customMuteDuration / 60)}小时${customMuteDuration % 60 ? `${customMuteDuration % 60}分钟` : ''}`
-                  : `${customMuteDuration}分钟`
-              }
-            </Text>
+      <AlertDialog open={customMuteModalVisible} onOpenChange={setCustomMuteModalVisible}>
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>自定义禁言时间</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div style={{ padding: '0 24px 24px' }}>
+            <label className="block mb-2">禁言时长（分钟）</label>
+            <Input
+              type="number"
+              value={customMuteDuration}
+              onChange={(e) => setCustomMuteDuration(Number(e.target.value))}
+              min={1}
+              max={43200}
+              className="w-full"
+            />
+            <div style={{ marginTop: 8, color: 'var(--semi-color-text-2)' }}>
+              <span className="text-sm">最少1分钟，最多30天（43200分钟）</span>
+              <br />
+              <span className="text-sm">
+                当前设置：
+                {customMuteDuration >= 1440
+                  ? `${Math.floor(customMuteDuration / 1440)}天${customMuteDuration % 1440 ? `${Math.floor((customMuteDuration % 1440) / 60)}小时${customMuteDuration % 60}分钟` : ''}`
+                  : customMuteDuration >= 60
+                    ? `${Math.floor(customMuteDuration / 60)}小时${customMuteDuration % 60 ? `${customMuteDuration % 60}分钟` : ''}`
+                    : `${customMuteDuration}分钟`
+                }
+              </span>
+            </div>
           </div>
-        </Form>
-      </Modal>
-    </Layout>
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline">取消</Button>
+            </AlertDialogClose>
+            <Button variant="default" onClick={handleCustomMute}>
+              确认
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose>
+              <Button variant="outline">取消</Button>
+            </AlertDialogClose>
+            <Button
+              variant={confirmDialog.isDanger ? 'destructive' : 'default'}
+              onClick={() => {
+                confirmDialog.onConfirm();
+                setConfirmDialog({ ...confirmDialog, open: false });
+              }}
+            >
+              确认
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+    </div>
   );
 };
 

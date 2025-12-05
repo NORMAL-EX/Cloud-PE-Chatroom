@@ -1,18 +1,17 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { LocaleProvider } from '@douyinfe/semi-ui';
-import zh_CN from '@douyinfe/semi-ui/lib/es/locale/source/zh_CN';
 import Login from './pages/Login';
 import Chat from './pages/Chat';
 import Console from './pages/Console';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider } from '@/components/ui/toast';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 
 function App() {
   return (
-    <LocaleProvider locale={zh_CN}>
-      <ThemeProvider>
+    <ThemeProvider>
+      <ToastProvider>
         <AuthProvider>
           <Router>
             <Routes>
@@ -31,8 +30,8 @@ function App() {
             </Routes>
           </Router>
         </AuthProvider>
-      </ThemeProvider>
-    </LocaleProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

@@ -1,22 +1,22 @@
 import React, { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Nav, Typography, Button, Avatar, Dropdown } from '@douyinfe/semi-ui';
+import { Moon, Sun, Users, Settings as SettingsIcon } from 'lucide-react';
+import { CheckCircle } from '@/components/icon/CheckCircle';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import {
-  IconUserGroup, 
-  IconSetting,
-  IconMoon,
-  IconSun,
-  IconCheckCircleStroked
-} from '@douyinfe/semi-icons';
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/ui/menu';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import PendingUsers from '../components/console/PendingUsers';
 import UserManagement from '../components/console/UserManagement';
 import Settings from '../components/console/Settings';
 import './Console.css';
-
-const { Header, Sider, Content, Footer } = Layout;
-const { Title, Text } = Typography;
 
 const Console: React.FC = () => {
   const navigate = useNavigate();
@@ -27,133 +27,169 @@ const Console: React.FC = () => {
 
   const getSelectedKeys = () => {
     const path = location.pathname;
-    if (path.includes('pending')) return ['pending'];
-    if (path.includes('users')) return ['users'];
-    if (path.includes('settings')) return ['settings'];
-    return ['pending'];
+    if (path.includes('pending')) return 'pending';
+    if (path.includes('users')) return 'users';
+    if (path.includes('settings')) return 'settings';
+    return 'pending';
   };
 
   const navItems = [
     {
-      itemKey: 'pending',
-      text: '待审核用户',
-      icon: <IconCheckCircleStroked />,
+      key: 'pending',
+      label: '待审核用户',
+      icon: CheckCircle,
       onClick: () => navigate('/console/pending')
     },
     {
-      itemKey: 'users',
-      text: '用户管理',
-      icon: <IconUserGroup />,
+      key: 'users',
+      label: '用户管理',
+      icon: Users,
       onClick: () => navigate('/console/users')
     },
     {
-      itemKey: 'settings',
-      text: '系统设置',
-      icon: <IconSetting />,
+      key: 'settings',
+      label: '系统设置',
+      icon: SettingsIcon,
       onClick: () => navigate('/console/settings')
     }
   ];
 
   const getAvatar = () => {
     if (user?.avatar) {
-      return <Avatar src={user.avatar} size="small" />;
+      return (
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={user.avatar} alt={user.username} />
+          <AvatarFallback>{user.username?.[0]?.toUpperCase() || '?'}</AvatarFallback>
+        </Avatar>
+      );
     }
-    
+
     const name = user?.username || '?';
     const firstChar = name[0].toUpperCase();
-    
+
     return (
-      <Avatar 
-        size="small" 
-        style={{ 
-          backgroundColor: 'var(--semi-color-primary)',
-          color: 'white'
-        }}
-      >
-        {firstChar}
+      <Avatar className="h-8 w-8 bg-primary text-primary-foreground">
+        <AvatarFallback>{firstChar}</AvatarFallback>
       </Avatar>
     );
   };
 
   return (
-    <Layout className="console-layout">
-      <Header className="console-header">
+    <div className="console-layout">
+      <header className="console-header">
         <div className="header-content">
           <div className="header-left">
-            <img 
-              src="https://p1.cloud-pe.cn/cloud-pe.png" 
-              alt="Cloud-PE" 
+            <img
+              src="https://p1.cloud-pe.cn/cloud-pe.png"
+              alt="Cloud-PE"
               className="console-logo"
               onClick={() => navigate('/')}
               style={{ cursor: 'pointer' }}
             />
-            <Title heading={4} style={{ margin: 0 }}>管理后台</Title>
+            <h4 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>管理后台</h4>
           </div>
           <div className="header-right">
             <Button
-              theme="borderless"
-              icon={theme === 'light' ? <IconMoon /> : <IconSun />}
+              variant="ghost"
+              size="icon"
               onClick={toggleTheme}
-            />
-            <Dropdown
-              render={
-                <Dropdown.Menu>
-                  <Dropdown.Item disabled style={{ cursor: 'default' }}>
-                    <Text strong>{user?.username}</Text>
-                  </Dropdown.Item>
-                  <Dropdown.Divider />
-                  <Dropdown.Item onClick={() => navigate('/')}>
-                    返回聊天
-                  </Dropdown.Item>
-                  <Dropdown.Item onClick={logout}>
-                    退出登录
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              }
             >
-              {getAvatar()}
-            </Dropdown>
+              {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                  {getAvatar()}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled style={{ opacity: 1, cursor: 'default' }}>
+                  <span style={{ fontWeight: 600 }}>{user?.username}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/')}>
+                  返回聊天
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={logout}>
+                  退出登录
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-      </Header>
+      </header>
 
-      <Layout className="console-body">
-        <Sider className="console-sider">
-          <Nav
-            selectedKeys={getSelectedKeys()}
-            items={navItems}
-            footer={{
-              collapseButton: true,
-            }}
-            isCollapsed={collapsed}
-            onCollapseChange={setCollapsed}
-          />
-        </Sider>
+      <div className="console-body">
+        <aside className="console-sider" data-collapsed={collapsed}>
+          <nav className="console-nav">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isSelected = getSelectedKeys() === item.key;
+              return (
+                <button
+                  key={item.key}
+                  className={`nav-item ${isSelected ? 'selected' : ''}`}
+                  onClick={item.onClick}
+                  data-collapsed={collapsed}
+                >
+                  <Icon size={20} />
+                  {!collapsed && <span>{item.label}</span>}
+                </button>
+              );
+            })}
+          </nav>
+          <div className="nav-footer">
+            <button
+              className="collapse-button"
+              onClick={() => setCollapsed(!collapsed)}
+              title={collapsed ? '展开侧边栏' : '收起侧边栏'}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  transform: collapsed ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 0.2s'
+                }}
+              >
+                <path d="M10 12L6 8l4-4" />
+              </svg>
+            </button>
+          </div>
+        </aside>
 
-        <Content className="console-content">
+        <main className="console-content">
           <Routes>
             <Route path="/" element={<PendingUsers />} />
             <Route path="/pending" element={<PendingUsers />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
-        </Content>
-      </Layout>
+        </main>
+      </div>
 
-      <Footer className="console-footer">
-        <Text type="tertiary">© 2025 Cloud-PE Team.</Text>
-        <Text type="tertiary">
-          <a 
-            href="https://beian.miit.gov.cn/#/Integrated/index" 
-            target="_blank" 
+      <footer className="console-footer">
+        <span style={{ color: 'var(--muted-foreground, #6b7280)', fontSize: '0.875rem' }}>
+          © 2025 Cloud-PE Team.
+        </span>
+        <span style={{ color: 'var(--muted-foreground, #6b7280)', fontSize: '0.875rem' }}>
+          <a
+            href="https://beian.miit.gov.cn/#/Integrated/index"
+            target="_blank"
             rel="noopener noreferrer"
             style={{ color: 'inherit', textDecoration: 'none' }}
           >
             鲁ICP备2023028946号
           </a>
-        </Text>
-      </Footer>
-    </Layout>
+        </span>
+      </footer>
+    </div>
   );
 };
 

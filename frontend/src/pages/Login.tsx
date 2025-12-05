@@ -1,17 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Form, Button, Toast, Typography, Card } from '@douyinfe/semi-ui';
-import { IconMoon, IconSun } from '@douyinfe/semi-icons';
+import { Moon, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { Form } from '@/components/ui/form';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardPanel } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+import { showToast } from '@/components/ui/toast';
 import axios from 'axios';
 import './Login.css';
-
-const { Title, Text } = Typography;
 
 interface PublicSettings {
   registration_open: boolean;
   require_approval: boolean;
+}
+
+interface FormErrors {
+  username?: string;
+  email?: string;
+  password?: string;
+  avatar?: string;
+  verification_code?: string;
 }
 
 const Login: React.FC = () => {
@@ -24,8 +36,17 @@ const Login: React.FC = () => {
   const [countdown, setCountdown] = useState(0);
   const [registrationOpen, setRegistrationOpen] = useState(true);
   const [requireApproval, setRequireApproval] = useState(false);
-  const formRef = useRef<any>();
+  const [errors, setErrors] = useState<FormErrors>({});
   const countdownTimerRef = useRef<number | null>(null);
+
+  // Form field states
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    avatar: '',
+    verification_code: '',
+  });
 
   useEffect(() => {
     if (user) {
@@ -70,28 +91,77 @@ const Login: React.FC = () => {
     };
   }, [countdown]);
 
-  const handleLogin = async (values: any) => {
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateForm = (isRegisterMode: boolean): boolean => {
+    const newErrors: FormErrors = {};
+
+    if (isRegisterMode) {
+      if (!formData.username.trim()) {
+        newErrors.username = '请输入用户名';
+      }
+      if (!formData.verification_code.trim()) {
+        newErrors.verification_code = '请输入验证码';
+      }
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = '请输入邮箱';
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = '请输入有效的邮箱地址';
+    }
+
+    if (!formData.password.trim()) {
+      newErrors.password = '请输入密码';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm(false)) {
+      return;
+    }
+
     setLoading(true);
-    const success = await login(values.email, values.password);
+    const success = await login(formData.email, formData.password);
     setLoading(false);
     if (success) {
       navigate('/');
     }
   };
 
-  const handleRegister = async (values: any) => {
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+
     if (!registrationOpen) {
-      Toast.error('注册功能已关闭');
+      showToast({
+        title: '注册功能已关闭',
+        type: 'error',
+      });
       return;
     }
-    
+
+    if (!validateForm(true)) {
+      return;
+    }
+
     setLoading(true);
-    const success = await register(values);
+    const success = await register(formData);
     setLoading(false);
     if (success) {
       if (requireApproval && registrationOpen) {
         // 如果需要审核，显示提示
-        Toast.info('注册成功，请等待管理员审核');
+        showToast({
+          title: '注册成功，请等待管理员审核',
+          type: 'info',
+        });
         setIsRegister(false);
       } else if (user) {
         navigate('/');
@@ -100,19 +170,22 @@ const Login: React.FC = () => {
   };
 
   const sendVerificationCode = async () => {
-    // 获取 form 的值
-    const values = formRef.current?.formApi?.getValues();
-    const email = values?.email;
-    
+    const email = formData.email;
+
     if (!email) {
-      Toast.error('请先输入邮箱');
+      showToast({
+        title: '请先输入邮箱',
+        type: 'error',
+      });
       return;
     }
 
     // 邮箱格式验证
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Toast.error('请输入有效的邮箱地址');
+    if (!validateEmail(email)) {
+      showToast({
+        title: '请输入有效的邮箱地址',
+        type: 'error',
+      });
       return;
     }
 
@@ -120,17 +193,29 @@ const Login: React.FC = () => {
     try {
       const response = await axios.post('/api/send-verification-code', { email });
       if (response.data.success) {
-        Toast.success('验证码已发送');
+        showToast({
+          title: '验证码已发送',
+          type: 'success',
+        });
         // 开始60秒倒计时
         setCountdown(60);
       } else {
-        Toast.error(response.data.message);
+        showToast({
+          title: response.data.message,
+          type: 'error',
+        });
       }
     } catch (error: any) {
       if (error.response?.data?.message) {
-        Toast.error(error.response.data.message);
+        showToast({
+          title: error.response.data.message,
+          type: 'error',
+        });
       } else {
-        Toast.error('发送失败');
+        showToast({
+          title: '发送失败',
+          type: 'error',
+        });
       }
     } finally {
       setSendingCode(false);
@@ -144,11 +229,34 @@ const Login: React.FC = () => {
     return '发送验证码';
   };
 
+  const handleInputChange = (field: keyof typeof formData) => (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const switchMode = (toRegister: boolean) => {
+    setIsRegister(toRegister);
+    setCountdown(0);
+    setErrors({});
+    setFormData({
+      username: '',
+      email: '',
+      password: '',
+      avatar: '',
+      verification_code: '',
+    });
+  };
+
   return (
     <div className="login-container">
       <Button
-        theme="borderless"
-        icon={theme === 'light' ? <IconMoon /> : <IconSun />}
+        variant="ghost"
+        size="icon"
         onClick={toggleTheme}
         className="theme-toggle"
         style={{
@@ -156,157 +264,225 @@ const Login: React.FC = () => {
           top: 20,
           right: 20,
         }}
-      />
-      
-      <Card className="login-card">
-        <div className="login-header">
-          <img src="https://p1.cloud-pe.cn/cloud-pe.png" alt="Cloud-PE" className="login-logo" />
-          <Title heading={2}>Cloud-PE 项目交流群</Title>
-        </div>
+      >
+        {theme === 'light' ? <Moon className="size-5" /> : <Sun className="size-5" />}
+      </Button>
 
-        {isRegister && registrationOpen ? (
-          <Form 
-            ref={formRef}
-            onSubmit={handleRegister} 
-            className="login-form"
-          >
-            <Form.Input
-              field="username"
-              label="用户名"
-              rules={[{ required: true, message: '请输入用户名' }]}
-              placeholder="请输入用户名"
-            />
-            <Form.Input
-              field="email"
-              label="邮箱"
-              rules={[
-                { required: true, message: '请输入邮箱' },
-                { type: 'email', message: '请输入有效的邮箱地址' }
-              ]}
-              placeholder="请输入邮箱"
-            />
-            <Form.Input
-              field="password"
-              label="密码"
-              type="password"
-              rules={[{ required: true, message: '请输入密码' }]}
-              placeholder="请输入密码"
-            />
-            <Form.Input
-              field="avatar"
-              label="头像链接"
-              placeholder="请输入头像链接（选填）"
-            />
-            <Form.Input
-              field="verification_code"
-              label="邮箱验证码"
-              rules={[{ required: true, message: '请输入验证码' }]}
-              placeholder="请输入验证码"
-              suffix={
-                <Button
-                  theme="borderless"
-                  loading={sendingCode}
-                  disabled={countdown > 0}
-                  onClick={sendVerificationCode}
-                  style={{ minWidth: '100px' }}
-                >
-                  {getCodeButtonText()}
-                </Button>
-              }
-            />
-            {requireApproval && (
-              <div style={{ marginBottom: 16 }}>
-                <Text type="tertiary" size="small">
-                  注：注册后需要管理员审核才能登录
-                </Text>
-              </div>
-            )}
-            <Button
-              theme="solid"
-              type="primary"
-              htmlType="submit"
-              loading={loading}
-              block
+      <Card className="login-card">
+        <CardPanel>
+          <div className="login-header">
+            <img src="https://p1.cloud-pe.cn/cloud-pe.png" alt="Cloud-PE" className="login-logo" />
+            <h2 className="text-2xl font-semibold">Cloud-PE 项目交流群</h2>
+          </div>
+
+          {isRegister && registrationOpen ? (
+            <Form
+              onSubmit={handleRegister}
+              className="login-form"
             >
-              注册
-            </Button>
-            <div className="login-switch">
-              <Text>已有账号？</Text>
-              <Button
-                theme="borderless"
-                type="primary"
-                onClick={() => {
-                  setIsRegister(false);
-                  setCountdown(0); // 切换时重置倒计时
-                }}
-              >
-                立即登录
-              </Button>
-            </div>
-          </Form>
-        ) : (
-          <Form onSubmit={handleLogin} className="login-form">
-            <Form.Input
-              field="email"
-              label="邮箱"
-              rules={[
-                { required: true, message: '请输入邮箱' },
-                { type: 'email', message: '请输入有效的邮箱地址' }
-              ]}
-              placeholder="请输入邮箱"
-            />
-            <Form.Input
-              field="password"
-              label="密码"
-              type="password"
-              rules={[{ required: true, message: '请输入密码' }]}
-              placeholder="请输入密码"
-            />
-            <Button
-              theme="solid"
-              type="primary"
-              htmlType="submit"
-              loading={loading}
-              block
-            >
-              登录
-            </Button>
-            {registrationOpen && (
-              <div className="login-switch">
-                <Text>没有账号？</Text>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="username">
+                    用户名 <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="username"
+                    type="text"
+                    placeholder="请输入用户名"
+                    value={formData.username}
+                    onChange={handleInputChange('username')}
+                    aria-invalid={!!errors.username}
+                  />
+                  {errors.username && (
+                    <p className="text-destructive text-sm mt-1">{errors.username}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">
+                    邮箱 <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="请输入邮箱"
+                    value={formData.email}
+                    onChange={handleInputChange('email')}
+                    aria-invalid={!!errors.email}
+                  />
+                  {errors.email && (
+                    <p className="text-destructive text-sm mt-1">{errors.email}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">
+                    密码 <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="请输入密码"
+                    value={formData.password}
+                    onChange={handleInputChange('password')}
+                    aria-invalid={!!errors.password}
+                  />
+                  {errors.password && (
+                    <p className="text-destructive text-sm mt-1">{errors.password}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="avatar">头像链接</Label>
+                  <Input
+                    id="avatar"
+                    type="text"
+                    placeholder="请输入头像链接（选填）"
+                    value={formData.avatar}
+                    onChange={handleInputChange('avatar')}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="verification_code">
+                    邮箱验证码 <span className="text-destructive">*</span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="verification_code"
+                      type="text"
+                      placeholder="请输入验证码"
+                      value={formData.verification_code}
+                      onChange={handleInputChange('verification_code')}
+                      aria-invalid={!!errors.verification_code}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={countdown > 0 || sendingCode}
+                      onClick={sendVerificationCode}
+                      className="min-w-[100px]"
+                    >
+                      {sendingCode ? <Spinner /> : getCodeButtonText()}
+                    </Button>
+                  </div>
+                  {errors.verification_code && (
+                    <p className="text-destructive text-sm mt-1">{errors.verification_code}</p>
+                  )}
+                </div>
+
+                {requireApproval && (
+                  <div className="text-muted-foreground text-sm">
+                    注：注册后需要管理员审核才能登录
+                  </div>
+                )}
+
                 <Button
-                  theme="borderless"
-                  type="primary"
-                  onClick={() => {
-                    setIsRegister(true);
-                    setCountdown(0); // 切换时重置倒计时
-                  }}
+                  type="submit"
+                  variant="default"
+                  disabled={loading}
+                  className="w-full"
                 >
-                  立即注册
+                  {loading ? <Spinner /> : '注册'}
                 </Button>
+
+                <div className="login-switch">
+                  <span className="text-sm">已有账号？</span>
+                  <Button
+                    type="button"
+                    variant="link"
+                    onClick={() => switchMode(false)}
+                    className="p-0 h-auto"
+                  >
+                    立即登录
+                  </Button>
+                </div>
               </div>
-            )}
-            {!registrationOpen && (
-              <div className="login-switch" style={{ marginTop: 16 }}>
-                <Text type="tertiary">注册功能已关闭</Text>
+            </Form>
+          ) : (
+            <Form onSubmit={handleLogin} className="login-form">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">
+                    邮箱 <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="请输入邮箱"
+                    value={formData.email}
+                    onChange={handleInputChange('email')}
+                    aria-invalid={!!errors.email}
+                  />
+                  {errors.email && (
+                    <p className="text-destructive text-sm mt-1">{errors.email}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">
+                    密码 <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="login-password"
+                    type="password"
+                    placeholder="请输入密码"
+                    value={formData.password}
+                    onChange={handleInputChange('password')}
+                    aria-invalid={!!errors.password}
+                  />
+                  {errors.password && (
+                    <p className="text-destructive text-sm mt-1">{errors.password}</p>
+                  )}
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="default"
+                  disabled={loading}
+                  className="w-full"
+                >
+                  {loading ? <Spinner /> : '登录'}
+                </Button>
+
+                {registrationOpen && (
+                  <div className="login-switch">
+                    <span className="text-sm">没有账号？</span>
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => switchMode(true)}
+                      className="p-0 h-auto"
+                    >
+                      立即注册
+                    </Button>
+                  </div>
+                )}
+
+                {!registrationOpen && (
+                  <div className="login-switch" style={{ marginTop: 16 }}>
+                    <span className="text-muted-foreground text-sm">注册功能已关闭</span>
+                  </div>
+                )}
               </div>
-            )}
-          </Form>
-        )}
+            </Form>
+          )}
+        </CardPanel>
       </Card>
 
       <div className="login-footer">
-        <Text type="tertiary">© 2025 Cloud-PE Team.</Text>
-        <Text type="tertiary">
-          <a 
-            href="https://beian.miit.gov.cn/#/Integrated/index" 
-            target="_blank" 
+        <span className="text-muted-foreground text-sm">© 2025 Cloud-PE Team.</span>
+        <span className="text-muted-foreground text-sm">
+          <a
+            href="https://beian.miit.gov.cn/#/Integrated/index"
+            target="_blank"
             rel="noopener noreferrer"
             style={{ color: 'inherit', textDecoration: 'none' }}
           >
             鲁ICP备2023028944号
           </a>
-        </Text>
+        </span>
       </div>
     </div>
   );

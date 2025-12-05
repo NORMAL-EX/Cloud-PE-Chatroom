@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import { Toast } from '@douyinfe/semi-ui';
+import { showToast } from '@/components/ui/toast';
 
 interface User {
   id: string;
@@ -68,14 +68,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await axios.post('/api/login', { email, password });
       if (response.data.success) {
         await checkAuth();
-        Toast.success(response.data.message);
+        showToast({ title: response.data.message, type: "success" });
         return true;
       } else {
-        Toast.error(response.data.message);
+        showToast({ title: response.data.message, type: "error" });
         return false;
       }
     } catch (error) {
-      Toast.error('登录失败');
+      showToast({ title: "登录失败", type: "error" });
       return false;
     }
   };
@@ -84,16 +84,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const response = await axios.post('/api/register', data);
       if (response.data.success) {
-        Toast.success(response.data.message);
+        showToast({ title: response.data.message, type: "success" });
         // 如果是第一个用户，会自动登录
         await checkAuth();
         return true;
       } else {
-        Toast.error(response.data.message);
+        showToast({ title: response.data.message, type: "error" });
         return false;
       }
     } catch (error) {
-      Toast.error('注册失败');
+      showToast({ title: "注册失败", type: "error" });
       return false;
     }
   };
@@ -102,9 +102,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await axios.post('/api/logout');
       setUser(null);
-      Toast.success('已退出登录');
+      showToast({ title: "已退出登录", type: "success" });
     } catch (error) {
-      Toast.error('退出登录失败');
+      showToast({ title: "退出登录失败", type: "error" });
     }
   };
 
